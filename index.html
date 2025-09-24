@@ -1,30 +1,66 @@
 <!DOCTYPE html>
-<html>
-    <head>
-        <title> Komanda </title>
-        <link rel="stylesheet" href="style.css">
-    </head>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Komanda Login</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="src/favicon_io/favicon-32x32.png" type="image/x-icon">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-box">
+            <div class="logo-area">
+                <img src="src/image.png" alt="Sua Logo">
+            </div>
+            
+            <form class="login-form">
+                
+                <div class="input-group">
+                    <label for="email">E-mail</label>
+                    <input type="email" id="email" name="email" placeholder="Digite seu e-mail" >
+                </div>
+                <div class="input-group">
+                    <label for="password">Senha</label>
+                    <input type="password" id="password" name="password" placeholder="Digite sua senha" >
+                </div>
+                <button type="submit" class="login-button">Entrar</button>
+            </form>
+        </div>
+    </div>
+    <script>
+        
+// Adicionando a lógica de validação do formulário
+const form = document.querySelector('.login-form');
 
+form.addEventListener('submit', function(event) {
+    // Previne o recarregamento da página
+    event.preventDefault();
 
-    <body>
-        <header>
-            <img src="image.png">
-            <ul>
-                <li><a href="">Cadastro</a></li>
-                <li><a href="">Vendas</a></li>
-                <li><a href="">Relatórios</a></li>
-               
-            </ul>
-        </header>
-        <section></section>
-        <section></section>
-        <section></section>
-        <section></section>
-    </body>
+    // 1. Defina o usuário e senha (APENAS VOCÊ DEVE SABER!)
+    const USUARIO_CORRETO = "l.martiins12@gmail.com";
+    const SENHA_CORRETA = "12345";
 
+    // 2. Captura os valores digitados nos campos
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
 
+    const usuarioDigitado = emailInput.value;
+    const senhaDigitada = passwordInput.value;
 
+    // 3. Verifica se o usuário e senha estão corretos
+    if (usuarioDigitado === USUARIO_CORRETO && senhaDigitada === SENHA_CORRETA) {
+        // Se estiverem corretos, redireciona para a página de sucesso
+        window.location.href = "home.html";
+    } else {
+        // Caso contrário, mostra um alerta de erro
+        alert("Usuário ou senha incorretos.");
+    }
+});
 
+    </script>
+</body>
+</html>
 
 
 
