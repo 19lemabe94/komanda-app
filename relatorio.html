@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Komanda app - QUAL É ?</title>
+    <link rel="icon" href="src/favicon_io/favicon-16x16.png" type="image/x-icon">
+
+    <style>
+        /* Estilos CSS */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background-color: #f9f9f9;
+            color: #333;
+        }
+
+        /* Menu de Navegação Fixo */
+        .top-menu {
+            background-color:white;
+            color: brown;
+            padding: 15px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            box-sizing: border-box; /* Garante que o padding não adicione largura */
+            z-index: 1000;
+        }
+
+        .logo-area img {
+            height: 50px; 
+            
+        }
+
+        .menu-items {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            gap: 25px;
+        }
+
+        .menu-items a {
+            color: brown;
+            text-decoration: none;
+            font-weight: bold;
+            transition: color 0.3s;
+        }
+
+        .menu-items a:hover {
+            color: #d1b8b8; /* Marrom claro para o hover */
+        }
+        
+        /* Estilo da Seção de Vendas */
+        .main-content {
+            padding-top: 80px; /* Espaço para evitar que o conteúdo fique atrás do menu fixo */
+            padding-bottom: 20px;
+            margin: 0 auto;
+            max-width: 900px;
+        }
+
+        .sales-section {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            text-align: center;
+        }
+
+        .sales-section h1 {
+            color: #4e3b3b;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <header class="top-menu">
+        <div class="logo-area">
+            <a href="home.html"><img src="src/image.png" alt="Logo da Empresa"></a>
+        </div>
+        <nav>
+            <ul class="menu-items">
+                <li><a href="relatorio.html">Relatórios</a></li>
+                <li><a href="cadastro.html">Cadastro</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main class="main-content">
+        <div class="sales-section">
+            <h1>Tela de Relatórios</h1>
+            <p>Aqui é onde a tela de Relatórios será construída.</p>
+            <p>Este é o layout principal, que pode ser preenchido com formulários, tabelas e outros elementos.</p>
+        </div>
+    </main>
+
+</body>
+</html>
