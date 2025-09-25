@@ -3,86 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Komanda app - QUAL É ?</title>
+    <title>Komanda app - Vendas</title>
     <link rel="icon" href="src/favicon_io/favicon-16x16.png" type="image/x-icon">
-
-    <style>
-        /* Estilos CSS */
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            background-color: #f9f9f9;
-            color: #333;
-        }
-
-        /* Menu de Navegação Fixo */
-        .top-menu {
-            background-color:white;
-            color: brown;
-            padding: 15px 40px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-            box-sizing: border-box; /* Garante que o padding não adicione largura */
-            z-index: 1000;
-        }
-
-        .logo-area img {
-            height: 50px; 
-            
-        }
-
-        .menu-items {
-            list-style: none;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            gap: 25px;
-        }
-
-        .menu-items a {
-            color: brown;
-            text-decoration: none;
-            font-weight: bold;
-            transition: color 0.3s;
-        }
-
-        .menu-items a:hover {
-            color: #d1b8b8; /* Marrom claro para o hover */
-        }
-        
-        /* Estilo da Seção de Vendas */
-        .main-content {
-            padding-top: 80px; /* Espaço para evitar que o conteúdo fique atrás do menu fixo */
-            padding-bottom: 20px;
-            margin: 0 auto;
-            max-width: 900px;
-        }
-
-        .sales-section {
-            background-color: #ffffff;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-            text-align: center;
-        }
-
-        .sales-section h1 {
-            color: #4e3b3b;
-            margin-bottom: 20px;
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400&family=Montserrat:wght@700&display=swap" rel="stylesheet">
 </head>
 <body>
 
     <header class="top-menu">
         <div class="logo-area">
-<a href="home.html"><img src="src/image.png" alt="Logo da Empresa"></a>        </div>
+            <a href="home.html"><img src="src/image.png" alt="Logo da Empresa"></a>
+        </div>
         <nav>
             <ul class="menu-items">
                 <li><a href="relatorio.html">Relatórios</a></li>
@@ -92,12 +25,300 @@
     </header>
 
     <main class="main-content">
-        <div class="sales-section">
-            <h1>Tela de Vendas</h1>
-            <p>Aqui é onde a tela de vendas será construída.</p>
-            <p>Este é o layout principal, que pode ser preenchido com formulários, tabelas e outros elementos.</p>
+        <div class="content-section">
+            <h1>Mesas e Comandas</h1>
+            
+            <div class="order-grid" id="orderGrid">
+                </div>
         </div>
     </main>
 
+    <script>
+        const vendasApiUrl = 'http://localhost:3000/api/vendas';
+        const produtosApiUrl = 'http://localhost:3000/api/produtos';
+        const orderGrid = document.getElementById('orderGrid');
+        const totalMesas = 10;
+        let expandedContainer = null;
+
+        function renderMesas() {
+            orderGrid.innerHTML = '';
+            for (let i = 1; i <= totalMesas; i++) {
+                const card = document.createElement('div');
+                card.classList.add('order-card');
+                card.dataset.mesa = i;
+                card.innerHTML = `
+                    <h3 class="title">Mesa ${i}</h3>
+                    <p class="subtitle">Comanda vazia</p>
+                `;
+                orderGrid.appendChild(card);
+            }
+        }
+
+        async function fetchVendasAbertas() {
+            try {
+                const response = await fetch(`${vendasApiUrl}/abertas`);
+                const vendasAbertas = await response.json();
+                
+                renderMesas();
+
+                vendasAbertas.forEach(venda => {
+                    const mesaCard = document.querySelector(`.order-card[data-mesa="${venda.numero_mesa}"]`);
+                    if (mesaCard) {
+                        mesaCard.classList.add('open');
+                        mesaCard.dataset.idVenda = venda.id_venda;
+                        const total = parseFloat(venda.total_venda).toFixed(2);
+                        mesaCard.innerHTML = `
+                            <h3 class="title">Mesa ${venda.numero_mesa}</h3>
+                            <p class="subtitle">Total: R$ ${total}</p>
+                            <p class="items-count">(${venda.total_itens} itens)</p>
+                        `;
+                    }
+                });
+            } catch (error) {
+                console.error('Erro ao buscar vendas abertas:', error);
+                alert('Não foi possível carregar as comandas. Verifique se o servidor está rodando.');
+            }
+        }
+
+        async function abrirComanda(numeroMesa) {
+            try {
+                const response = await fetch(`${vendasApiUrl}/abrir`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ numero_mesa: numeroMesa })
+                });
+
+                if (response.ok) {
+                    await fetchVendasAbertas();
+                    const novaComanda = await response.json();
+                    const card = document.querySelector(`.order-card[data-mesa="${numeroMesa}"]`);
+                    if(card) expandirComanda(card, novaComanda.id);
+                } else {
+                    const errorData = await response.json();
+                    alert(errorData.error || 'Erro ao abrir a comanda.');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Não foi possível conectar ao servidor. Verifique se ele está rodando.');
+            }
+        }
+        
+        async function fecharComanda(idVenda) {
+            const confirmacao = confirm('Deseja realmente fechar esta comanda?');
+            if (!confirmacao) return;
+
+            try {
+                const response = await fetch(`${vendasApiUrl}/${idVenda}/fechar`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+
+                if (response.ok) {
+                    alert('Comanda fechada com sucesso!');
+                    const card = document.querySelector(`.order-card[data-id-venda="${idVenda}"]`);
+                    if (card) {
+                        if (expandedContainer) {
+                            expandedContainer.remove();
+                            expandedContainer = null;
+                        }
+                        fetchVendasAbertas();
+                    }
+                } else {
+                    const errorData = await response.json();
+                    alert(errorData.error || 'Erro ao fechar comanda.');
+                }
+            } catch (error) {
+                console.error('Erro ao fechar comanda:', error);
+                alert('Não foi possível conectar ao servidor para fechar a comanda.');
+            }
+        }
+
+        async function excluirComanda(idVenda) {
+            const confirmacao = confirm('Deseja realmente EXCLUIR esta comanda? Esta ação é irreversível.');
+            if (!confirmacao) return;
+
+            try {
+                const response = await fetch(`${vendasApiUrl}/${idVenda}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    alert('Comanda excluída com sucesso!');
+                    if (expandedContainer) {
+                        expandedContainer.remove();
+                        expandedContainer = null;
+                    }
+                    fetchVendasAbertas();
+                } else {
+                    const errorData = await response.json();
+                    alert(errorData.error || 'Erro ao excluir comanda.');
+                }
+            } catch (error) {
+                console.error('Erro ao excluir comanda:', error);
+                alert('Não foi possível conectar ao servidor para excluir a comanda.');
+            }
+        }
+
+        async function expandirComanda(card, idVenda) {
+            if (expandedContainer) {
+                expandedContainer.remove();
+                expandedContainer = null;
+            }
+
+            try {
+                const response = await fetch(`${vendasApiUrl}/${idVenda}`);
+                const venda = await response.json();
+                
+                const productsResponse = await fetch(produtosApiUrl);
+                const products = await productsResponse.json();
+
+                const productsListOptions = products.map(p => 
+                    `<option value="${p.id_produto}">${p.nome_produto} - R$ ${parseFloat(p.preco_unitario).toFixed(2)}</option>`
+                ).join('');
+
+                const container = document.createElement('div');
+                container.classList.add('order-details-container');
+                container.innerHTML = `
+                    <div class="order-details-content">
+                        <div>
+                            <h3>Itens da Comanda</h3>
+                            <ul class="order-items-list" id="orderItemsList-${idVenda}">
+                                ${venda.items.map(item => `
+                                    <li data-id-item="${item.id_item_venda}">
+                                        <span>${item.quantidade}x ${item.nome_produto}</span>
+                                        <div class="item-actions">
+                                            <span>R$ ${parseFloat(item.preco_unitario_no_momento * item.quantidade).toFixed(2)}</span>
+                                            <button class="btn-remove-item" data-id-item="${item.id_item_venda}">X</button>
+                                        </div>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                        <div class="order-summary">
+                            <div>
+                                <h3>Adicionar Item</h3>
+                                <form class="add-item-form" data-venda-id="${idVenda}">
+                                    <select id="selectProduto-${idVenda}" required>
+                                        <option value="">Selecione um produto...</option>
+                                        ${productsListOptions}
+                                    </select>
+                                    <input type="number" id="quantidade-${idVenda}" placeholder="Qtd" min="1" value="1" required>
+                                    <button type="submit">Adicionar</button>
+                                </form>
+                            </div>
+                            <div>
+                                <div class="total">
+                                    <span>Total:</span>
+                                    <span>R$ ${parseFloat(venda.total).toFixed(2)}</span>
+                                </div>
+                                <div class="action-buttons" style="margin-top: 20px;">
+                                    <button class="btn-finalize" data-venda-id="${idVenda}">Finalizar Venda</button>
+                                    <button class="btn-delete-order" data-venda-id="${idVenda}">Excluir Comanda</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                card.insertAdjacentElement('afterend', container);
+                expandedContainer = container;
+
+                const formAddItem = container.querySelector('.add-item-form');
+                formAddItem.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const idProduto = document.getElementById(`selectProduto-${idVenda}`).value;
+                    const quantidade = document.getElementById(`quantidade-${idVenda}`).value;
+                    await adicionarItem(idVenda, idProduto, quantidade);
+                    expandirComanda(card, idVenda);
+                    fetchVendasAbertas();
+                });
+
+                const btnFinalize = container.querySelector('.btn-finalize');
+                btnFinalize.addEventListener('click', () => fecharComanda(idVenda));
+
+                const btnExcluirComanda = container.querySelector('.btn-delete-order');
+                btnExcluirComanda.addEventListener('click', () => excluirComanda(idVenda));
+
+                const itemsList = container.querySelector('.order-items-list');
+                itemsList.addEventListener('click', async (e) => {
+                    if (e.target.classList.contains('btn-remove-item')) {
+                        const idItem = e.target.dataset.idItem;
+                        await removerItem(idVenda, idItem);
+                        expandirComanda(card, idVenda);
+                        fetchVendasAbertas();
+                    }
+                });
+
+            } catch (error) {
+                console.error('Erro ao expandir comanda:', error);
+                alert('Não foi possível carregar os detalhes da comanda.');
+            }
+        }
+        
+        async function adicionarItem(idVenda, idProduto, quantidade) {
+            try {
+                const response = await fetch(`${vendasApiUrl}/${idVenda}/item`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id_produto: idProduto, quantidade: quantidade })
+                });
+                
+                if (response.ok) {
+                    alert('Item adicionado com sucesso!');
+                } else {
+                    const errorData = await response.json();
+                    alert(errorData.error || 'Erro ao adicionar item.');
+                }
+            } catch (error) {
+                console.error('Erro ao adicionar item:', error);
+                alert('Não foi possível conectar ao servidor.');
+            }
+        }
+
+        async function removerItem(idVenda, idItem) {
+            const confirmacao = confirm('Deseja realmente remover este item?');
+            if (!confirmacao) return;
+
+            try {
+                const response = await fetch(`${vendasApiUrl}/${idVenda}/item/${idItem}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    alert('Item removido com sucesso!');
+                } else {
+                    const errorData = await response.json();
+                    alert(errorData.error || 'Erro ao remover item.');
+                }
+            } catch (error) {
+                console.error('Erro ao remover item:', error);
+                alert('Não foi possível conectar ao servidor.');
+            }
+        }
+
+        orderGrid.addEventListener('click', async function(event) {
+            const card = event.target.closest('.order-card');
+            if (!card) return;
+
+            const idVenda = card.dataset.idVenda;
+            const numeroMesa = card.dataset.mesa;
+
+            if (expandedContainer && expandedContainer.previousElementSibling === card) {
+                expandedContainer.remove();
+                expandedContainer = null;
+                return;
+            }
+
+            if (idVenda) {
+                expandirComanda(card, idVenda);
+            } else {
+                await abrirComanda(numeroMesa);
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchVendasAbertas();
+        });
+    </script>
 </body>
 </html>

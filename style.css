@@ -1,15 +1,49 @@
+
+
+:root {
+    --font-heading: 'Montserrat', sans-serif;
+    --font-body: 'Lato', sans-serif;
+}
+
+body {
+    font-family: var(--font-body);
+    /* O resto do seu CSS para body... */
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    /* O resto do seu CSS para títulos... */
+}
+
+/* Você pode remover a linha original de font-family do seu CSS */
+.top-menu a {
+    font-family: var(--font-heading);
+}
+
+/* O resto do seu CSS continua aqui... */
+
+
+/* Adicione esta regra ao final do seu style.css */
+.input-group input:focus, 
+.input-group textarea:focus, 
+.input-group select:focus {
+    border-color: #d1b8b8; /* Cor suave para a borda */
+    box-shadow: 0 0 5px rgba(78, 59, 59, 0.5); /* Sombra marrom suave */
+    outline: none; /* Remove o contorno azul */
+}
+
 /* Estilos CSS gerais */
 body {
     font-family: Arial, sans-serif;
     margin: 0;
     background-color: #f9f9f9;
-    color: #4e3b3b;
+    color: brown;
 }
 
 /* Menu de Navegação Fixo */
 .top-menu {
     background-color: white;
-    color: #4e3b3b;
+    color: brown;
     padding: 15px 40px;
     display: flex;
     justify-content: space-between;
@@ -33,7 +67,7 @@ body {
     gap: 25px;
 }
 .menu-items a {
-    color: #4e3b3b;
+    color: brown;
     text-decoration: none;
     font-weight: bold;
     transition: color 0.3s;
@@ -42,10 +76,11 @@ body {
     color: #d1b8b8;
 }
 .main-content {
-    padding-top: 80px;
+    padding-top: 100px;
     padding-bottom: 20px;
     margin: 0 auto;
     max-width: 900px;
+    
 }
 .content-section {
     background-color: #ffffff;
@@ -54,7 +89,7 @@ body {
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
 }
 .content-section h1 {
-    color: #4e3b3b;
+    color: brown;
     margin-bottom: 20px;
     text-align: center;
 }
@@ -83,7 +118,7 @@ body {
 }
 .btn-cadastrar {
     grid-column: 1 / -1;
-    background-color: #4e3b3b;
+    background-color: brown;
     color: white;
     padding: 12px;
     border: none;
@@ -93,7 +128,7 @@ body {
     transition: background-color 0.3s;
 }
 .btn-cadastrar:hover {
-    background-color: #6b5a5a;
+    background-color: brown;
 }
 
 /* Estilos da Tabela de Produtos */
@@ -107,7 +142,7 @@ body {
     margin-bottom: 15px;
 }
 .btn-acao {
-    background-color: #6b5a5a;
+    background-color: brown;
     color: white;
     padding: 8px 12px;
     border: none;
@@ -117,7 +152,7 @@ body {
     transition: background-color 0.3s;
 }
 .btn-acao:hover {
-    background-color: #4e3b3b;
+    background-color: brown;
 }
 .product-table {
     width: 100%;
@@ -129,7 +164,7 @@ body {
     border-bottom: 1px solid #ddd;
 }
 .product-table th {
-    background-color: #4e3b3b;
+    background-color: brown;
     color: white;
     font-weight: bold;
     text-transform: uppercase;
@@ -143,8 +178,8 @@ body {
 }
 .action-buttons button {
     background: none;
-    border: 1px solid #6b5a5a;
-    color: #6b5a5a;
+    border: 1px solid brown;
+    color: brown;
     padding: 6px 10px;
     border-radius: 4px;
     cursor: pointer;
@@ -152,7 +187,7 @@ body {
     transition: background-color 0.3s, color 0.3s;
 }
 .action-buttons button:hover {
-    background-color: #6b5a5a;
+    background-color: brown;
     color: white;
 }
 .input-with-button {
@@ -161,4 +196,139 @@ body {
 }
 .input-with-button select {
     flex-grow: 1;
+}
+
+/* Estilos para o painel de Comandas/Mesas */
+.order-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 20px;
+    padding-top: 20px;
+}
+
+.order-card {
+    background-color: #ffffff;
+    border: 1px solid #d1b8b8;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.order-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+.order-card .title {
+    font-family: var(--font-heading);
+    font-size: 1.5em;
+    color: #4e3b3b;
+    margin: 0;
+}
+
+.order-card .subtitle {
+    font-family: var(--font-body);
+    font-size: 1em;
+    color: brown;
+    margin: 5px 0 0;
+}
+
+.order-card.open {
+    border: 2px solid #4e3b3b;
+}
+
+
+/* Estilos para a seção de detalhes da comanda expandida */
+.order-details-container {
+    background-color: #f2f2f2;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.1);
+    grid-column: 1 / -1; /* Ocupa a largura total da grade */
+    margin-top: -15px; /* Para se alinhar melhor com o cartão */
+    z-index: 1;
+}
+
+.order-details-content {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 20px;
+}
+
+.order-items-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.order-items-list li {
+    padding: 10px 0;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    justify-content: space-between;
+}
+
+.order-items-list li:last-child {
+    border-bottom: none;
+}
+
+.order-summary {
+    background-color: #ffffff;
+    padding: 15px;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.order-summary .total {
+    font-size: 1.2em;
+    font-weight: bold;
+    text-align: right;
+    margin-top: 10px;
+    color: #4e3b3b;
+}
+
+.add-item-form {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.add-item-form select,
+.add-item-form input {
+    flex-grow: 1;
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+}
+
+.add-item-form button {
+    padding: 8px 15px;
+    background-color: #4e3b3b;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+/* Estilo para o botão de excluir a comanda */
+.btn-delete-order {
+    width: 100%;
+    padding: 12px;
+    background-color: brown; /* Um marrom um pouco mais claro para diferenciar do finalizar */
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.3s;
+    margin-top: 10px;
+}
+
+.btn-delete-order:hover {
+    background-color: #4e3b3b; /* Fica marrom mais escuro no hover */
 }
