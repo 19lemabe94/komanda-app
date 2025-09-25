@@ -19,6 +19,12 @@ const dbConfig = {
     database: 'vendas_db'
 };
 
+// --- Função para normalizar strings (NOVO) ---
+function normalizeString(str) {
+    if (!str) return null;
+    return str.normalize('NFD').replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
 // --- Função para inicializar o banco de dados e as tabelas ---
 const initializeDatabase = async () => {
     let connection;
@@ -82,7 +88,7 @@ const initializeDatabase = async () => {
     }
 };
 
-// --- API Endpoints para CATEGORIAS (NOVAS ROTAS) ---
+// --- API Endpoints para CATEGORIAS ---
 
 // READ: Endpoint para obter todas as categorias
 app.get('/api/categorias', async (req, res) => {
@@ -107,7 +113,7 @@ app.post('/api/categorias', async (req, res) => {
         if (!nome) {
             return res.status(400).json({ message: 'O nome da categoria é obrigatório.' });
         }
-        nome = nome.toLowerCase();
+        nome = normalizeString(nome);
         connection = await mysql.createConnection(dbConfig);
         const [result] = await connection.query('INSERT INTO categorias (nome_categoria) VALUES (?)', [nome]);
         res.status(201).json({ id: result.insertId, message: 'Categoria cadastrada com sucesso.' });
@@ -119,7 +125,7 @@ app.post('/api/categorias', async (req, res) => {
     }
 });
 
-// DELETE: Endpoint para excluir uma categoria (NOVA ROTA)
+// DELETE: Endpoint para excluir uma categoria
 app.delete('/api/categorias/:id', async (req, res) => {
     const { id } = req.params;
     let connection;
@@ -134,7 +140,6 @@ app.delete('/api/categorias/:id', async (req, res) => {
         res.json({ message: 'Categoria excluída com sucesso.' });
     } catch (error) {
         console.error('Erro ao excluir categoria:', error);
-        // Captura o erro específico de chave estrangeira
         if (error.code === 'ER_ROW_IS_REFERENCED_2' || error.errno === 1451) {
             res.status(409).json({ error: 'Não é possível excluir esta categoria porque há produtos associados a ela.' });
         } else {
@@ -152,8 +157,8 @@ app.post('/api/produtos', async (req, res) => {
     let { nome, preco, descricao, id_categoria } = req.body;
     let connection;
     try {
-        nome = nome.toLowerCase();
-        descricao = descricao ? descricao.toLowerCase() : null;
+        nome = normalizeString(nome);
+        descricao = normalizeString(descricao);
         connection = await mysql.createConnection(dbConfig);
         const sql = `INSERT INTO produtos (nome_produto, preco_unitario, descricao, id_categoria) VALUES (?, ?, ?, ?)`;
         const [result] = await connection.query(sql, [nome, preco, descricao, id_categoria]);
@@ -200,8 +205,8 @@ app.put('/api/produtos/:id', async (req, res) => {
     let { nome, preco, descricao, id_categoria } = req.body;
     let connection;
     try {
-        nome = nome.toLowerCase();
-        descricao = descricao ? descricao.toLowerCase() : null;
+        nome = normalizeString(nome);
+        descricao = normalizeString(descricao);
         connection = await mysql.createConnection(dbConfig);
         const sql = `UPDATE produtos SET nome_produto = ?, preco_unitario = ?, descricao = ?, id_categoria = ? WHERE id_produto = ?`;
         const [result] = await connection.query(sql, [nome, preco, descricao, id_categoria, id]);
