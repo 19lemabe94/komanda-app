@@ -19,7 +19,7 @@ const dbConfig = {
     database: 'vendas_db'
 };
 
-// --- Função para normalizar strings (NOVO) ---
+// --- Função para normalizar strings ---
 function normalizeString(str) {
     if (!str) return null;
     return str.normalize('NFD').replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -43,7 +43,6 @@ const initializeDatabase = async () => {
             multipleStatements: true
         });
 
-        // --- Código SQL para criar as tabelas ---
         const createTablesSql = `
             CREATE TABLE IF NOT EXISTS categorias (
                 id_categoria INT AUTO_INCREMENT PRIMARY KEY,
@@ -62,8 +61,11 @@ const initializeDatabase = async () => {
             
             CREATE TABLE IF NOT EXISTS vendas (
                 id_venda INT AUTO_INCREMENT PRIMARY KEY,
-                data_venda DATETIME DEFAULT CURRENT_TIMESTAMP,
-                total_venda DECIMAL(10, 2) NOT NULL
+                numero_mesa INT NOT NULL,
+                status_venda VARCHAR(255) NOT NULL,
+                data_abertura DATETIME DEFAULT CURRENT_TIMESTAMP,
+                data_fechamento DATETIME,
+                total_venda DECIMAL(10, 2) DEFAULT 0.00
             );
             
             CREATE TABLE IF NOT EXISTS itens_venda (
@@ -72,8 +74,8 @@ const initializeDatabase = async () => {
                 id_produto INT NOT NULL,
                 quantidade INT NOT NULL,
                 preco_unitario_no_momento DECIMAL(10, 2) NOT NULL,
-                FOREIGN KEY (id_venda) REFERENCES vendas(id_venda),
-                FOREIGN KEY (id_produto) REFERENCES produtos(id_produto)
+                FOREIGN KEY (id_venda) REFERENCES vendas(id_venda) ON DELETE CASCADE,
+                FOREIGN KEY (id_produto) REFERENCES produtos(id_produto) ON DELETE CASCADE
             );
         `;
 
@@ -89,8 +91,6 @@ const initializeDatabase = async () => {
 };
 
 // --- API Endpoints para CATEGORIAS ---
-
-// READ: Endpoint para obter todas as categorias
 app.get('/api/categorias', async (req, res) => {
     let connection;
     try {
@@ -105,7 +105,6 @@ app.get('/api/categorias', async (req, res) => {
     }
 });
 
-// CREATE: Endpoint para cadastrar uma nova categoria
 app.post('/api/categorias', async (req, res) => {
     let { nome } = req.body;
     let connection;
@@ -125,7 +124,6 @@ app.post('/api/categorias', async (req, res) => {
     }
 });
 
-// DELETE: Endpoint para excluir uma categoria
 app.delete('/api/categorias/:id', async (req, res) => {
     const { id } = req.params;
     let connection;
@@ -151,8 +149,6 @@ app.delete('/api/categorias/:id', async (req, res) => {
 });
 
 // --- API Endpoints para PRODUTOS ---
-
-// CREATE: Endpoint para cadastrar um novo produto
 app.post('/api/produtos', async (req, res) => {
     let { nome, preco, descricao, id_categoria } = req.body;
     let connection;
@@ -171,7 +167,6 @@ app.post('/api/produtos', async (req, res) => {
     }
 });
 
-// READ: Endpoint para obter todos os produtos
 app.get('/api/produtos', async (req, res) => {
     let connection;
     try {
@@ -199,7 +194,6 @@ app.get('/api/produtos', async (req, res) => {
     }
 });
 
-// UPDATE: Endpoint para atualizar um produto
 app.put('/api/produtos/:id', async (req, res) => {
     const { id } = req.params;
     let { nome, preco, descricao, id_categoria } = req.body;
@@ -223,7 +217,6 @@ app.put('/api/produtos/:id', async (req, res) => {
     }
 });
 
-// DELETE: Endpoint para excluir um produto
 app.delete('/api/produtos/:id', async (req, res) => {
     const { id } = req.params;
     let connection;
@@ -239,6 +232,185 @@ app.delete('/api/produtos/:id', async (req, res) => {
     } catch (error) {
         console.error('Erro ao excluir produto:', error);
         res.status(500).json({ error: 'Erro ao excluir o produto.' });
+    } finally {
+        if (connection) connection.end();
+    }
+});
+
+// --- API Endpoints para VENDAS (NOVAS ROTAS) ---
+
+// READ: Obtém todas as comandas abertas, com total e número da mesa
+app.get('/api/vendas/abertas', async (req, res) => {
+    let connection;
+    try {
+        connection = await mysql.createConnection(dbConfig);
+        const sql = `
+            SELECT 
+                v.id_venda,
+                v.numero_mesa,
+                v.total_venda,
+                v.data_abertura,
+                COUNT(iv.id_item_venda) AS total_itens
+            FROM vendas AS v
+            LEFT JOIN itens_venda AS iv ON v.id_venda = iv.id_venda
+            WHERE v.status_venda = 'aberta'
+            GROUP BY v.id_venda, v.numero_mesa, v.total_venda, v.data_abertura
+            ORDER BY v.numero_mesa ASC
+        `;
+        const [rows] = await connection.query(sql);
+        res.json(rows);
+    } catch (error) {
+        console.error('Erro ao buscar vendas abertas:', error);
+        res.status(500).json({ error: 'Erro ao buscar vendas.' });
+    } finally {
+        if (connection) connection.end();
+    }
+});
+
+// CREATE: Abre uma nova comanda para uma mesa
+app.post('/api/vendas/abrir', async (req, res) => {
+    const { numero_mesa } = req.body;
+    let connection;
+    try {
+        connection = await mysql.createConnection(dbConfig);
+        const [existing] = await connection.query(`SELECT * FROM vendas WHERE numero_mesa = ? AND status_venda = 'aberta'`, [numero_mesa]);
+        if (existing.length > 0) {
+            return res.status(409).json({ error: 'Já existe uma comanda aberta para esta mesa.' });
+        }
+        const sql = `INSERT INTO vendas (numero_mesa, status_venda) VALUES (?, 'aberta')`;
+        const [result] = await connection.query(sql, [numero_mesa]);
+        res.status(201).json({ id: result.insertId, message: 'Comanda aberta com sucesso.' });
+    } catch (error) {
+        console.error('Erro ao abrir comanda:', error);
+        res.status(500).json({ error: 'Erro ao abrir a comanda.' });
+    } finally {
+        if (connection) connection.end();
+    }
+});
+
+// READ: Obtém os detalhes de uma comanda (itens e total)
+app.get('/api/vendas/:id', async (req, res) => {
+    const { id } = req.params;
+    let connection;
+    try {
+        connection = await mysql.createConnection(dbConfig);
+        const sql = `
+            SELECT 
+                iv.id_item_venda, 
+                iv.quantidade, 
+                iv.preco_unitario_no_momento,
+                p.nome_produto
+            FROM itens_venda AS iv
+            JOIN produtos AS p ON iv.id_produto = p.id_produto
+            WHERE iv.id_venda = ?
+        `;
+        const [items] = await connection.query(sql, [id]);
+        
+        const [total] = await connection.query(`SELECT total_venda FROM vendas WHERE id_venda = ?`, [id]);
+
+        res.json({
+            items: items,
+            total: total[0].total_venda
+        });
+    } catch (error) {
+        console.error('Erro ao obter detalhes da venda:', error);
+        res.status(500).json({ error: 'Erro ao buscar detalhes da venda.' });
+    } finally {
+        if (connection) connection.end();
+    }
+});
+
+// CREATE: Adiciona um item a uma comanda
+app.post('/api/vendas/:id/item', async (req, res) => {
+    const { id } = req.params;
+    const { id_produto, quantidade } = req.body;
+    let connection;
+    try {
+        connection = await mysql.createConnection(dbConfig);
+        const [product] = await connection.query(`SELECT preco_unitario FROM produtos WHERE id_produto = ?`, [id_produto]);
+        if (product.length === 0) {
+            return res.status(404).json({ error: 'Produto não encontrado.' });
+        }
+        const preco_unitario_no_momento = product[0].preco_unitario;
+
+        await connection.query(
+            `INSERT INTO itens_venda (id_venda, id_produto, quantidade, preco_unitario_no_momento) VALUES (?, ?, ?, ?)`,
+            [id, id_produto, quantidade, preco_unitario_no_momento]
+        );
+        
+        const total_item = preco_unitario_no_momento * quantidade;
+        await connection.query(`UPDATE vendas SET total_venda = total_venda + ? WHERE id_venda = ?`, [total_item, id]);
+
+        res.status(201).json({ message: 'Item adicionado à comanda.' });
+    } catch (error) {
+        console.error('Erro ao adicionar item à venda:', error);
+        res.status(500).json({ error: 'Erro ao adicionar item à venda.' });
+    } finally {
+        if (connection) connection.end();
+    }
+});
+
+// DELETE: Remove um item de uma comanda
+app.delete('/api/vendas/:id/item/:id_item', async (req, res) => {
+    const { id, id_item } = req.params;
+    let connection;
+    try {
+        connection = await mysql.createConnection(dbConfig);
+        const [item] = await connection.query(`SELECT quantidade, preco_unitario_no_momento FROM itens_venda WHERE id_item_venda = ?`, [id_item]);
+        if (item.length === 0) {
+            return res.status(404).json({ error: 'Item não encontrado na comanda.' });
+        }
+        
+        await connection.query(`DELETE FROM itens_venda WHERE id_item_venda = ?`, [id_item]);
+        
+        const total_item_removido = item[0].quantidade * item[0].preco_unitario_no_momento;
+        await connection.query(`UPDATE vendas SET total_venda = total_venda - ? WHERE id_venda = ?`, [total_item_removido, id]);
+
+        res.json({ message: 'Item removido da comanda.' });
+    } catch (error) {
+        console.error('Erro ao remover item da venda:', error);
+        res.status(500).json({ error: 'Erro ao remover item da venda.' });
+    } finally {
+        if (connection) connection.end();
+    }
+});
+
+// PUT: Fecha a comanda
+app.put('/api/vendas/:id/fechar', async (req, res) => {
+    const { id } = req.params;
+    let connection;
+    try {
+        connection = await mysql.createConnection(dbConfig);
+        const sql = `UPDATE vendas SET status_venda = 'fechada', data_fechamento = NOW() WHERE id_venda = ?`;
+        const [result] = await connection.query(sql, [id]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Comanda não encontrada.' });
+        }
+        res.json({ message: 'Comanda fechada com sucesso.' });
+    } catch (error) {
+        console.error('Erro ao fechar comanda:', error);
+        res.status(500).json({ error: 'Erro ao fechar a comanda.' });
+    } finally {
+        if (connection) connection.end();
+    }
+});
+
+// DELETE: Exclui uma comanda (NOVA ROTA)
+app.delete('/api/vendas/:id', async (req, res) => {
+    const { id } = req.params;
+    let connection;
+    try {
+        connection = await mysql.createConnection(dbConfig);
+        const [result] = await connection.query(`DELETE FROM vendas WHERE id_venda = ?`, [id]);
+        
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Comanda não encontrada.' });
+        }
+        res.json({ message: 'Comanda excluída com sucesso.' });
+    } catch (error) {
+        console.error('Erro ao excluir comanda:', error);
+        res.status(500).json({ error: 'Erro ao excluir a comanda.' });
     } finally {
         if (connection) connection.end();
     }
