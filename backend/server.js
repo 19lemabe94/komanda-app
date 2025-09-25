@@ -237,9 +237,7 @@ app.delete('/api/produtos/:id', async (req, res) => {
     }
 });
 
-// --- API Endpoints para VENDAS (NOVAS ROTAS) ---
-
-// READ: Obtém todas as comandas abertas, com total e número da mesa
+// --- API Endpoints para VENDAS ---
 app.get('/api/vendas/abertas', async (req, res) => {
     let connection;
     try {
@@ -267,7 +265,6 @@ app.get('/api/vendas/abertas', async (req, res) => {
     }
 });
 
-// CREATE: Abre uma nova comanda para uma mesa
 app.post('/api/vendas/abrir', async (req, res) => {
     const { numero_mesa } = req.body;
     let connection;
@@ -288,7 +285,6 @@ app.post('/api/vendas/abrir', async (req, res) => {
     }
 });
 
-// READ: Obtém os detalhes de uma comanda (itens e total)
 app.get('/api/vendas/:id', async (req, res) => {
     const { id } = req.params;
     let connection;
@@ -320,7 +316,6 @@ app.get('/api/vendas/:id', async (req, res) => {
     }
 });
 
-// CREATE: Adiciona um item a uma comanda
 app.post('/api/vendas/:id/item', async (req, res) => {
     const { id } = req.params;
     const { id_produto, quantidade } = req.body;
@@ -350,7 +345,6 @@ app.post('/api/vendas/:id/item', async (req, res) => {
     }
 });
 
-// DELETE: Remove um item de uma comanda
 app.delete('/api/vendas/:id/item/:id_item', async (req, res) => {
     const { id, id_item } = req.params;
     let connection;
@@ -375,7 +369,6 @@ app.delete('/api/vendas/:id/item/:id_item', async (req, res) => {
     }
 });
 
-// PUT: Fecha a comanda
 app.put('/api/vendas/:id/fechar', async (req, res) => {
     const { id } = req.params;
     let connection;
@@ -396,7 +389,6 @@ app.put('/api/vendas/:id/fechar', async (req, res) => {
     }
 });
 
-// DELETE: Exclui uma comanda (NOVA ROTA)
 app.delete('/api/vendas/:id', async (req, res) => {
     const { id } = req.params;
     let connection;
@@ -411,6 +403,80 @@ app.delete('/api/vendas/:id', async (req, res) => {
     } catch (error) {
         console.error('Erro ao excluir comanda:', error);
         res.status(500).json({ error: 'Erro ao excluir a comanda.' });
+    } finally {
+        if (connection) connection.end();
+    }
+});
+
+// --- API Endpoints para RELATÓRIOS (NOVOS) ---
+
+// Relatório 1: Faturamento Total (Alterado para o total do dia)
+app.get('/api/relatorios/faturamento', async (req, res) => {
+    let connection;
+    try {
+        connection = await mysql.createConnection(dbConfig);
+        const sql = `
+            SELECT SUM(total_venda) AS faturamento_total 
+            FROM vendas 
+            WHERE status_venda = 'fechada' 
+            AND DATE(data_fechamento) = CURDATE()
+        `;
+        const [rows] = await connection.query(sql);
+        res.json({ faturamento_total: rows[0].faturamento_total || 0 });
+    } catch (error) {
+        console.error('Erro ao obter faturamento total:', error);
+        res.status(500).json({ error: 'Erro ao obter faturamento total.' });
+    } finally {
+        if (connection) connection.end();
+    }
+});
+
+// Relatório 2: Vendas por Período
+app.get('/api/relatorios/vendas_por_periodo', async (req, res) => {
+    const { data_inicio, data_fim } = req.query;
+    let connection;
+    try {
+        connection = await mysql.createConnection(dbConfig);
+        const sql = `
+            SELECT 
+                id_venda, 
+                numero_mesa, 
+                total_venda, 
+                DATE_FORMAT(data_fechamento, '%d/%m/%Y %H:%i') as data_fechamento
+            FROM vendas
+            WHERE status_venda = 'fechada' AND data_fechamento BETWEEN ? AND ?
+            ORDER BY data_fechamento DESC
+        `;
+        const [rows] = await connection.query(sql, [data_inicio, data_fim]);
+        res.json(rows);
+    } catch (error) {
+        console.error('Erro ao obter vendas por período:', error);
+        res.status(500).json({ error: 'Erro ao obter vendas por período.' });
+    } finally {
+        if (connection) connection.end();
+    }
+});
+
+// Relatório 3: Produtos Mais Vendidos
+app.get('/api/relatorios/produtos_mais_vendidos', async (req, res) => {
+    let connection;
+    try {
+        connection = await mysql.createConnection(dbConfig);
+        const sql = `
+            SELECT 
+                p.nome_produto,
+                SUM(iv.quantidade) AS total_vendido
+            FROM itens_venda AS iv
+            JOIN produtos AS p ON iv.id_produto = p.id_produto
+            GROUP BY p.nome_produto
+            ORDER BY total_vendido DESC
+            LIMIT 10
+        `;
+        const [rows] = await connection.query(sql);
+        res.json(rows);
+    } catch (error) {
+        console.error('Erro ao obter produtos mais vendidos:', error);
+        res.status(500).json({ error: 'Erro ao obter produtos mais vendidos.' });
     } finally {
         if (connection) connection.end();
     }
