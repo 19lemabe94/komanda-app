@@ -104,6 +104,17 @@
         }
         
         async function fecharComanda(idVenda) {
+            const metodoPagamento = prompt('Método de pagamento: (1) Dinheiro, (2) Cartão/Pix');
+            let pagamento = '';
+            if (metodoPagamento === '1') {
+                pagamento = 'dinheiro';
+            } else if (metodoPagamento === '2') {
+                pagamento = 'cartao/pix';
+            } else {
+                alert('Método de pagamento inválido.');
+                return;
+            }
+
             const confirmacao = confirm('Deseja realmente fechar esta comanda?');
             if (!confirmacao) return;
 
@@ -111,6 +122,7 @@
                 const response = await fetch(`${vendasApiUrl}/${idVenda}/fechar`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ metodo_pagamento: pagamento })
                 });
 
                 if (response.ok) {
@@ -166,7 +178,7 @@
             }
 
             try {
-                const response = await fetch(`${vendasApiUrl}/${idVenda}`);
+                const response = await fetch(`${vendasApiUrl}/${idVenda}`); // <--- CORRIGIDO
                 const venda = await response.json();
                 
                 const productsResponse = await fetch(produtosApiUrl);
@@ -257,7 +269,7 @@
         
         async function adicionarItem(idVenda, idProduto, quantidade) {
             try {
-                const response = await fetch(`${vendasApiUrl}/${idVenda}/item`, {
+                const response = await fetch(`${vendasApiUrl}/${idVenda}/item`, { // <--- CORRIGIDO
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ id_produto: idProduto, quantidade: quantidade })
@@ -280,7 +292,7 @@
             if (!confirmacao) return;
 
             try {
-                const response = await fetch(`${vendasApiUrl}/${idVenda}/item/${idItem}`, {
+                const response = await fetch(`${vendasApiUrl}/${idVenda}/item/${idItem}`, { // <--- CORRIGIDO
                     method: 'DELETE'
                 });
                 
@@ -317,6 +329,7 @@
         });
 
         document.addEventListener('DOMContentLoaded', () => {
+            renderMesas();
             fetchVendasAbertas();
         });
     </script>

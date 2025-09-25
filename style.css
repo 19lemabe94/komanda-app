@@ -76,10 +76,10 @@ body {
     color: #d1b8b8;
 }
 .main-content {
-    padding-top: 100px;
+    padding-top: 120px;
     padding-bottom: 20px;
     margin: 0 auto;
-    max-width: 900px;
+    max-width: 1500px;
     
 }
 .content-section {
@@ -377,4 +377,82 @@ body {
     padding: 10px;
     text-align: left;
     border-bottom: 1px solid #ddd;
+}
+
+/* Estilos para a tela de Relatórios */
+.reports-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 20px;
+}
+
+.reports-main-column {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.report-card {
+    background-color: #f2f2f2;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.report-value {
+    font-size: 2em;
+    font-weight: bold;
+    color: #4e3b3b;
+}
+
+.date-input-group {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+    align-items: center;
+}
+
+.date-input-group input {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.report-table {
+    width: 100%;
+    margin-top: 20px;
+    border-collapse: collapse;
+}
+
+.report-table th, .report-table td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+/* Estilos para o faturamento do dia detalhado */
+.faturamento-details {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-top: 15px;
+}
+
+.faturamento-details .report-value {
+    margin: 0;
+    font-size: 2em;
+}
+
+.faturamento-details .small-value {
+    font-size: 1.1em;
+    font-weight: bold;
+    margin: 0;
+}
+
+.reports-main-column .report-card {
+    height: fit-content;
+}
+
+.reports-main-column .report-card:first-child {
+    grid-row: span 2;
 }

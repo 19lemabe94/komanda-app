@@ -28,86 +28,109 @@
         <div class="content-section">
             <h1>Relatórios Gerenciais</h1>
             
-            <div class="reports-container">
+            <div class="reports-grid">
 
-                <div class="report-card">
-                    <h2>Faturamento Total</h2>
-                    <p class="report-value" id="faturamentoTotal">Carregando...</p>
+                <div class="reports-main-column">
+                    <div class="report-card">
+                        <h2>Faturamento do Dia</h2>
+                        <div class="faturamento-details">
+                            <p class="report-value" id="faturamentoTotal">Carregando...</p>
+                            <p class="small-value">Dinheiro: <span id="totalDinheiro">R$ 0,00</span></p>
+                            <p class="small-value">Cartão/Pix: <span id="totalCartaoPix">R$ 0,00</span></p>
+                        </div>
+                    </div>
+
+                    <div class="report-card">
+                        <h2>Vendas por Período</h2>
+                        <form id="formVendasPorPeriodo">
+                            <div class="date-input-group">
+                                <label for="dataInicio">De:</label>
+                                <input type="date" id="dataInicio" required>
+                                <label for="dataFim">Até:</label>
+                                <input type="date" id="dataFim" required>
+                            </div>
+                            <button type="submit" class="btn-acao">Gerar Relatório</button>
+                        </form>
+                    </div>
+
+                    <div class="report-card">
+                        <h2>Produtos Mais Vendidos</h2>
+                        <table class="report-table" id="produtosMaisVendidosTable">
+                            <thead>
+                                <tr>
+                                    <th>Produto</th>
+                                    <th>Categoria</th>
+                                    <th>Quantidade</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                </tbody>
+                        </table>
+                    </div>
                 </div>
 
-                <div class="report-card">
-                    <h2>Vendas por Período</h2>
-                    <form id="formVendasPorPeriodo">
-                        <div class="date-input-group">
-                            <label for="dataInicio">De:</label>
-                            <input type="date" id="dataInicio" required>
-                            <label for="dataFim">Até:</label>
-                            <input type="date" id="dataFim" required>
-                        </div>
-                        <button type="submit" class="btn-acao">Gerar Relatório</button>
-                    </form>
-                    <table class="report-table" id="vendasPorPeriodoTable">
+                <div class="reports-sales-list">
+                    <h2>Histórico de Vendas</h2>
+                    <table class="report-table" id="vendasFechadasTable">
                         <thead>
                             <tr>
-                                <th>ID Venda</th>
+                                <th>ID</th>
                                 <th>Mesa</th>
                                 <th>Total (R$)</th>
                                 <th>Data</th>
+                                <th>Ações</th>
                             </tr>
                         </thead>
                         <tbody>
                             </tbody>
                     </table>
                 </div>
-
-                <div class="report-card">
-                    <h2>Produtos Mais Vendidos no Periodo</h2>
-                    <table class="report-table" id="produtosMaisVendidosTable">
-                        <thead>
-                            <tr>
-                                <th>Produto</th>
-                                <th>Quantidade</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            </tbody>
-                    </table>
-                </div>
-
             </div>
         </div>
     </main>
 
     <script>
         const relatoriosApiUrl = 'http://localhost:3000/api/relatorios';
+        const vendasApiUrl = 'http://localhost:3000/api/vendas';
 
-        // Elementos do DOM
         const faturamentoTotalEl = document.getElementById('faturamentoTotal');
+        const totalDinheiroEl = document.getElementById('totalDinheiro');
+        const totalCartaoPixEl = document.getElementById('totalCartaoPix');
         const formVendasPorPeriodo = document.getElementById('formVendasPorPeriodo');
-        const vendasPorPeriodoTableBody = document.querySelector('#vendasPorPeriodoTable tbody');
         const produtosMaisVendidosTableBody = document.querySelector('#produtosMaisVendidosTable tbody');
+        const vendasFechadasTableBody = document.querySelector('#vendasFechadasTable tbody');
 
-        // Funções para buscar dados dos relatórios
         async function fetchFaturamentoTotal() {
             try {
                 const response = await fetch(`${relatoriosApiUrl}/faturamento`);
                 const data = await response.json();
-                faturamentoTotalEl.textContent = `R$ ${parseFloat(data.faturamento_total).toFixed(2)}`;
+                
+                const faturamentoTotal = data.faturamento_total ?? 0;
+                const totalDinheiro = data.total_dinheiro ?? 0;
+                const totalCartaoPix = data.total_cartao_pix ?? 0;
+                
+                faturamentoTotalEl.textContent = `R$ ${parseFloat(faturamentoTotal).toFixed(2)}`;
+                totalDinheiroEl.textContent = `R$ ${parseFloat(totalDinheiro).toFixed(2)}`;
+                totalCartaoPixEl.textContent = `R$ ${parseFloat(totalCartaoPix).toFixed(2)}`;
             } catch (error) {
                 console.error('Erro ao buscar faturamento total:', error);
                 faturamentoTotalEl.textContent = 'Erro ao carregar';
             }
         }
 
-        async function fetchVendasPorPeriodo(dataInicio, dataFim) {
+        async function fetchVendasFechadas(dataInicio, dataFim) {
             try {
-                vendasPorPeriodoTableBody.innerHTML = '<tr><td colspan="4">Carregando...</td></tr>';
-                const response = await fetch(`${relatoriosApiUrl}/vendas_por_periodo?data_inicio=${dataInicio}&data_fim=${dataFim}`);
+                vendasFechadasTableBody.innerHTML = '<tr><td colspan="5">Carregando...</td></tr>';
+                const params = new URLSearchParams();
+                if (dataInicio) params.append('data_inicio', dataInicio);
+                if (dataFim) params.append('data_fim', dataFim);
+
+                const response = await fetch(`${relatoriosApiUrl}/vendas_fechadas?${params.toString()}`);
                 const vendas = await response.json();
 
-                vendasPorPeriodoTableBody.innerHTML = '';
+                vendasFechadasTableBody.innerHTML = '';
                 if (vendas.length === 0) {
-                    vendasPorPeriodoTableBody.innerHTML = '<tr><td colspan="4">Nenhuma venda encontrada.</td></tr>';
+                    vendasFechadasTableBody.innerHTML = '<tr><td colspan="5">Nenhuma venda encontrada.</td></tr>';
                     return;
                 }
 
@@ -118,24 +141,27 @@
                         <td>${venda.numero_mesa}</td>
                         <td>${parseFloat(venda.total_venda).toFixed(2)}</td>
                         <td>${venda.data_fechamento}</td>
+                        <td class="action-buttons">
+                            <button class="btn-delete" data-id="${venda.id_venda}">Excluir</button>
+                        </td>
                     `;
-                    vendasPorPeriodoTableBody.appendChild(row);
+                    vendasFechadasTableBody.appendChild(row);
                 });
             } catch (error) {
-                console.error('Erro ao buscar vendas por período:', error);
-                vendasPorPeriodoTableBody.innerHTML = '<tr><td colspan="4">Erro ao carregar dados.</td></tr>';
+                console.error('Erro ao buscar vendas fechadas:', error);
+                vendasFechadasTableBody.innerHTML = '<tr><td colspan="5">Erro ao carregar dados.</td></tr>';
             }
         }
 
         async function fetchProdutosMaisVendidos() {
             try {
-                produtosMaisVendidosTableBody.innerHTML = '<tr><td colspan="2">Carregando...</td></tr>';
+                produtosMaisVendidosTableBody.innerHTML = '<tr><td colspan="3">Carregando...</td></tr>';
                 const response = await fetch(`${relatoriosApiUrl}/produtos_mais_vendidos`);
                 const produtos = await response.json();
 
                 produtosMaisVendidosTableBody.innerHTML = '';
                 if (produtos.length === 0) {
-                    produtosMaisVendidosTableBody.innerHTML = '<tr><td colspan="2">Nenhum produto vendido.</td></tr>';
+                    produtosMaisVendidosTableBody.innerHTML = '<tr><td colspan="3">Nenhum produto vendido.</td></tr>';
                     return;
                 }
 
@@ -143,28 +169,54 @@
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td>${produto.nome_produto}</td>
+                        <td>${produto.nome_categoria || 'Sem Categoria'}</td>
                         <td>${produto.total_vendido}</td>
                     `;
                     produtosMaisVendidosTableBody.appendChild(row);
                 });
             } catch (error) {
                 console.error('Erro ao buscar produtos mais vendidos:', error);
-                produtosMaisVendidosTableBody.innerHTML = '<tr><td colspan="2">Erro ao carregar dados.</td></tr>';
+                produtosMaisVendidosTableBody.innerHTML = '<tr><td colspan="3">Erro ao carregar dados.</td></tr>';
             }
         }
 
-        // Event Listeners
+        async function excluirVenda(id) {
+            const confirmacao = confirm('Deseja realmente excluir esta venda? Esta ação é irreversível.');
+            if (!confirmacao) return;
+            
+            try {
+                const response = await fetch(`${vendasApiUrl}/${id}`, { method: 'DELETE' });
+                if (response.ok) {
+                    alert('Venda excluída com sucesso!');
+                    fetchVendasFechadas();
+                } else {
+                    alert('Erro ao excluir a venda.');
+                }
+            } catch (error) {
+                console.error('Erro ao excluir venda:', error);
+                alert('Não foi possível conectar ao servidor.');
+            }
+        }
+
         formVendasPorPeriodo.addEventListener('submit', function(e) {
             e.preventDefault();
             const dataInicio = document.getElementById('dataInicio').value;
             const dataFim = document.getElementById('dataFim').value;
-            fetchVendasPorPeriodo(dataInicio, dataFim);
+            fetchVendasFechadas(dataInicio, dataFim);
         });
 
-        // Carrega os relatórios ao carregar a página
+        vendasFechadasTableBody.addEventListener('click', function(e) {
+            const target = e.target;
+            const vendaId = target.dataset.id;
+            if (target.classList.contains('btn-delete')) {
+                excluirVenda(vendaId);
+            }
+        });
+
         document.addEventListener('DOMContentLoaded', () => {
             fetchFaturamentoTotal();
             fetchProdutosMaisVendidos();
+            fetchVendasFechadas();
         });
     </script>
 </body>

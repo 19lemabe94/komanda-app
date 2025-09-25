@@ -65,7 +65,8 @@ const initializeDatabase = async () => {
                 status_venda VARCHAR(255) NOT NULL,
                 data_abertura DATETIME DEFAULT CURRENT_TIMESTAMP,
                 data_fechamento DATETIME,
-                total_venda DECIMAL(10, 2) DEFAULT 0.00
+                total_venda DECIMAL(10, 2) DEFAULT 0.00,
+                metodo_pagamento VARCHAR(255)
             );
             
             CREATE TABLE IF NOT EXISTS itens_venda (
@@ -371,11 +372,12 @@ app.delete('/api/vendas/:id/item/:id_item', async (req, res) => {
 
 app.put('/api/vendas/:id/fechar', async (req, res) => {
     const { id } = req.params;
+    const { metodo_pagamento } = req.body;
     let connection;
     try {
         connection = await mysql.createConnection(dbConfig);
-        const sql = `UPDATE vendas SET status_venda = 'fechada', data_fechamento = NOW() WHERE id_venda = ?`;
-        const [result] = await connection.query(sql, [id]);
+        const sql = `UPDATE vendas SET status_venda = 'fechada', data_fechamento = NOW(), metodo_pagamento = ? WHERE id_venda = ?`;
+        const [result] = await connection.query(sql, [metodo_pagamento, id]);
 
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: 'Comanda não encontrada.' });
@@ -410,19 +412,38 @@ app.delete('/api/vendas/:id', async (req, res) => {
 
 // --- API Endpoints para RELATÓRIOS (NOVOS) ---
 
-// Relatório 1: Faturamento Total (Alterado para o total do dia)
+// Relatório 1: Faturamento Total do Dia detalhado por método de pagamento
 app.get('/api/relatorios/faturamento', async (req, res) => {
     let connection;
     try {
         connection = await mysql.createConnection(dbConfig);
-        const sql = `
-            SELECT SUM(total_venda) AS faturamento_total 
+        
+        // Query para o total do dia
+        const [totalDia] = await connection.query(`
+            SELECT SUM(total_venda) AS total_dia 
             FROM vendas 
-            WHERE status_venda = 'fechada' 
-            AND DATE(data_fechamento) = CURDATE()
-        `;
-        const [rows] = await connection.query(sql);
-        res.json({ faturamento_total: rows[0].faturamento_total || 0 });
+            WHERE status_venda = 'fechada' AND DATE(data_fechamento) = CURDATE()
+        `);
+
+        // Query para o total em dinheiro
+        const [totalDinheiro] = await connection.query(`
+            SELECT SUM(total_venda) AS total_dinheiro 
+            FROM vendas 
+            WHERE status_venda = 'fechada' AND DATE(data_fechamento) = CURDATE() AND metodo_pagamento = 'dinheiro'
+        `);
+        
+        // Query para o total em cartão/pix
+        const [totalCartaoPix] = await connection.query(`
+            SELECT SUM(total_venda) AS total_cartao_pix 
+            FROM vendas 
+            WHERE status_venda = 'fechada' AND DATE(data_fechamento) = CURDATE() AND metodo_pagamento = 'cartao/pix'
+        `);
+
+        res.json({
+            faturamento_total: totalDia[0].total_dia || 0,
+            total_dinheiro: totalDinheiro[0].total_dinheiro || 0,
+            total_cartao_pix: totalCartaoPix[0].total_cartao_pix || 0
+        });
     } catch (error) {
         console.error('Erro ao obter faturamento total:', error);
         res.status(500).json({ error: 'Erro ao obter faturamento total.' });
@@ -431,23 +452,43 @@ app.get('/api/relatorios/faturamento', async (req, res) => {
     }
 });
 
-// Relatório 2: Vendas por Período
-app.get('/api/relatorios/vendas_por_periodo', async (req, res) => {
+// Relatório 2: Vendas por Período e Todas as Vendas Fechadas
+app.get('/api/relatorios/vendas_fechadas', async (req, res) => {
     const { data_inicio, data_fim } = req.query;
     let connection;
     try {
         connection = await mysql.createConnection(dbConfig);
-        const sql = `
-            SELECT 
-                id_venda, 
-                numero_mesa, 
-                total_venda, 
-                DATE_FORMAT(data_fechamento, '%d/%m/%Y %H:%i') as data_fechamento
-            FROM vendas
-            WHERE status_venda = 'fechada' AND data_fechamento BETWEEN ? AND ?
-            ORDER BY data_fechamento DESC
-        `;
-        const [rows] = await connection.query(sql, [data_inicio, data_fim]);
+        let sql;
+        let params = [];
+
+        if (data_inicio && data_fim) {
+            sql = `
+                SELECT 
+                    id_venda, 
+                    numero_mesa, 
+                    total_venda, 
+                    DATE_FORMAT(data_fechamento, '%d/%m/%Y %H:%i') as data_fechamento,
+                    metodo_pagamento
+                FROM vendas
+                WHERE status_venda = 'fechada' AND data_fechamento BETWEEN ? AND ?
+                ORDER BY data_fechamento DESC
+            `;
+            params = [data_inicio, data_fim];
+        } else {
+            sql = `
+                SELECT 
+                    id_venda, 
+                    numero_mesa, 
+                    total_venda, 
+                    DATE_FORMAT(data_fechamento, '%d/%m/%Y %H:%i') as data_fechamento,
+                    metodo_pagamento
+                FROM vendas
+                WHERE status_venda = 'fechada'
+                ORDER BY data_fechamento DESC
+            `;
+        }
+        
+        const [rows] = await connection.query(sql, params);
         res.json(rows);
     } catch (error) {
         console.error('Erro ao obter vendas por período:', error);
@@ -465,10 +506,12 @@ app.get('/api/relatorios/produtos_mais_vendidos', async (req, res) => {
         const sql = `
             SELECT 
                 p.nome_produto,
+                c.nome_categoria,
                 SUM(iv.quantidade) AS total_vendido
             FROM itens_venda AS iv
             JOIN produtos AS p ON iv.id_produto = p.id_produto
-            GROUP BY p.nome_produto
+            LEFT JOIN categorias AS c ON p.id_categoria = c.id_categoria
+            GROUP BY p.nome_produto, c.nome_categoria
             ORDER BY total_vendido DESC
             LIMIT 10
         `;
@@ -481,6 +524,26 @@ app.get('/api/relatorios/produtos_mais_vendidos', async (req, res) => {
         if (connection) connection.end();
     }
 });
+
+// PUT: Reabre uma venda fechada
+app.put('/api/vendas/:id/reabrir', async (req, res) => {
+    const { id } = req.params;
+    let connection;
+    try {
+        connection = await mysql.createConnection(dbConfig);
+        const [result] = await connection.query(`UPDATE vendas SET status_venda = 'aberta', data_fechamento = NULL WHERE id_venda = ?`, [id]);
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Venda não encontrada.' });
+        }
+        res.json({ message: 'Venda reaberta com sucesso!' });
+    } catch (error) {
+        console.error('Erro ao reabrir venda:', error);
+        res.status(500).json({ error: 'Erro ao reabrir a venda.' });
+    } finally {
+        if (connection) connection.end();
+    }
+});
+
 
 // --- Inicia o Servidor ---
 const startServer = async () => {
