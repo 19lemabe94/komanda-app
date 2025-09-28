@@ -15,20 +15,27 @@ app.use(cors());
 const dbConfig = {
     host: 'localhost',
     user: 'root',
-    password: 'P@ssword2018', // Sua senha do MySQL
+    password: 'P@ssword2018',
     database: 'vendas_db'
 };
 
-// --- Função para normalizar strings ---
-function normalizeString(str) {
-    if (!str) return null;
-    return str.normalize('NFD').replace(/[\u0300-\u036f]/g, "").toLowerCase();
-}
+// --- Funções de Conexão e Inicialização ---
 
-// --- Função para inicializar o banco de dados e as tabelas ---
+/**
+ * Cria e retorna uma nova conexão com o banco de dados.
+ * @returns {Promise<mysql.Connection>} A conexão com o banco de dados.
+ */
+const getConnection = async () => {
+    return await mysql.createConnection(dbConfig);
+};
+
+/**
+ * Inicializa o banco de dados e as tabelas, se não existirem.
+ */
 const initializeDatabase = async () => {
     let connection;
     try {
+        // Passo 1: Cria uma conexão para verificar/criar o banco de dados.
         connection = await mysql.createConnection({
             host: dbConfig.host,
             user: dbConfig.user,
@@ -38,17 +45,18 @@ const initializeDatabase = async () => {
         console.log(`Banco de dados '${dbConfig.database}' verificado/criado com sucesso.`);
         connection.end();
 
-        connection = await mysql.createConnection({
-            ...dbConfig,
-            multipleStatements: true
-        });
+        // Passo 2: Cria uma nova conexão já no banco de dados correto.
+        connection = await getConnection();
 
-        const createTablesSql = `
+        // Passo 3: Cria cada tabela individualmente para evitar erros de sintaxe.
+        await connection.query(`
             CREATE TABLE IF NOT EXISTS categorias (
                 id_categoria INT AUTO_INCREMENT PRIMARY KEY,
                 nome_categoria VARCHAR(255) NOT NULL UNIQUE
             );
-            
+        `);
+
+        await connection.query(`
             CREATE TABLE IF NOT EXISTS produtos (
                 id_produto INT AUTO_INCREMENT PRIMARY KEY,
                 nome_produto VARCHAR(255) NOT NULL,
@@ -56,9 +64,11 @@ const initializeDatabase = async () => {
                 preco_unitario DECIMAL(10, 2) NOT NULL,
                 data_cadastro DATETIME DEFAULT CURRENT_TIMESTAMP,
                 id_categoria INT,
-                FOREIGN KEY (id_categoria) REFERENCES categorias(id_categoria)
+                FOREIGN KEY (id_categoria) REFERENCES categorias(id_categoria) ON DELETE SET NULL
             );
-            
+        `);
+
+        await connection.query(`
             CREATE TABLE IF NOT EXISTS vendas (
                 id_venda INT AUTO_INCREMENT PRIMARY KEY,
                 numero_mesa INT NOT NULL,
@@ -66,9 +76,12 @@ const initializeDatabase = async () => {
                 data_abertura DATETIME DEFAULT CURRENT_TIMESTAMP,
                 data_fechamento DATETIME,
                 total_venda DECIMAL(10, 2) DEFAULT 0.00,
+                total_itens INT DEFAULT 0,
                 metodo_pagamento VARCHAR(255)
             );
-            
+        `);
+
+        await connection.query(`
             CREATE TABLE IF NOT EXISTS itens_venda (
                 id_item_venda INT AUTO_INCREMENT PRIMARY KEY,
                 id_venda INT NOT NULL,
@@ -78,9 +91,8 @@ const initializeDatabase = async () => {
                 FOREIGN KEY (id_venda) REFERENCES vendas(id_venda) ON DELETE CASCADE,
                 FOREIGN KEY (id_produto) REFERENCES produtos(id_produto) ON DELETE CASCADE
             );
-        `;
+        `);
 
-        await connection.query(createTablesSql);
         console.log('Tabelas verificadas/criadas com sucesso.');
 
     } catch (error) {
@@ -91,16 +103,40 @@ const initializeDatabase = async () => {
     }
 };
 
+// --- Funções de Auxílio ---
+
+/**
+ * Normaliza uma string para minúsculas e remove acentos.
+ * @param {string} str A string a ser normalizada.
+ * @returns {string|null} A string normalizada ou null se a entrada for inválida.
+ */
+const normalizeString = (str) => {
+    if (str === null || str === undefined) return null;
+    return str.normalize('NFD').replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+};
+
+/**
+ * Função utilitária para tratamento de erros em rotas.
+ * @param {object} res O objeto de resposta do Express.
+ * @param {Error} error O objeto de erro.
+ * @param {string} message A mensagem de erro amigável.
+ * @param {number} statusCode O código de status HTTP.
+ */
+const handleError = (res, error, message, statusCode = 500) => {
+    console.error(`Erro: ${message}`, error);
+    res.status(statusCode).json({ error: message });
+};
+
 // --- API Endpoints para CATEGORIAS ---
+
 app.get('/api/categorias', async (req, res) => {
     let connection;
     try {
-        connection = await mysql.createConnection(dbConfig);
+        connection = await getConnection();
         const [rows] = await connection.query('SELECT * FROM categorias ORDER BY nome_categoria ASC');
         res.json(rows);
     } catch (error) {
-        console.error('Erro ao obter as categorias:', error);
-        res.status(500).json({ error: 'Erro ao buscar categorias.' });
+        handleError(res, error, 'Erro ao obter as categorias.');
     } finally {
         if (connection) connection.end();
     }
@@ -114,22 +150,24 @@ app.post('/api/categorias', async (req, res) => {
             return res.status(400).json({ message: 'O nome da categoria é obrigatório.' });
         }
         nome = normalizeString(nome);
-        connection = await mysql.createConnection(dbConfig);
+        connection = await getConnection();
         const [result] = await connection.query('INSERT INTO categorias (nome_categoria) VALUES (?)', [nome]);
         res.status(201).json({ id: result.insertId, message: 'Categoria cadastrada com sucesso.' });
     } catch (error) {
-        console.error('Erro ao cadastrar categoria:', error);
-        res.status(500).json({ error: 'Erro ao cadastrar a categoria.' });
+        handleError(res, error, 'Erro ao cadastrar a categoria.');
     } finally {
         if (connection) connection.end();
     }
 });
 
 app.delete('/api/categorias/:id', async (req, res) => {
-    const { id } = req.params;
+    const id = parseInt(req.params.id);
     let connection;
     try {
-        connection = await mysql.createConnection(dbConfig);
+        if (isNaN(id)) {
+            return res.status(400).json({ error: 'ID da categoria inválido.' });
+        }
+        connection = await getConnection();
         const sql = `DELETE FROM categorias WHERE id_categoria = ?`;
         const [result] = await connection.query(sql, [id]);
 
@@ -138,11 +176,10 @@ app.delete('/api/categorias/:id', async (req, res) => {
         }
         res.json({ message: 'Categoria excluída com sucesso.' });
     } catch (error) {
-        console.error('Erro ao excluir categoria:', error);
         if (error.code === 'ER_ROW_IS_REFERENCED_2' || error.errno === 1451) {
-            res.status(409).json({ error: 'Não é possível excluir esta categoria porque há produtos associados a ela.' });
+            handleError(res, error, 'Não é possível excluir esta categoria porque há produtos associados a ela.', 409);
         } else {
-            res.status(500).json({ error: 'Erro ao excluir a categoria.' });
+            handleError(res, error, 'Erro ao excluir a categoria.');
         }
     } finally {
         if (connection) connection.end();
@@ -154,15 +191,17 @@ app.post('/api/produtos', async (req, res) => {
     let { nome, preco, descricao, id_categoria } = req.body;
     let connection;
     try {
+        if (!nome || !preco) {
+            return res.status(400).json({ error: 'Nome e preço do produto são obrigatórios.' });
+        }
         nome = normalizeString(nome);
         descricao = normalizeString(descricao);
-        connection = await mysql.createConnection(dbConfig);
+        connection = await getConnection();
         const sql = `INSERT INTO produtos (nome_produto, preco_unitario, descricao, id_categoria) VALUES (?, ?, ?, ?)`;
         const [result] = await connection.query(sql, [nome, preco, descricao, id_categoria]);
         res.status(201).json({ id: result.insertId, message: 'Produto cadastrado com sucesso.' });
     } catch (error) {
-        console.error('Erro ao cadastrar produto:', error);
-        res.status(500).json({ error: 'Erro ao cadastrar o produto.' });
+        handleError(res, error, 'Erro ao cadastrar o produto.');
     } finally {
         if (connection) connection.end();
     }
@@ -171,7 +210,7 @@ app.post('/api/produtos', async (req, res) => {
 app.get('/api/produtos', async (req, res) => {
     let connection;
     try {
-        connection = await mysql.createConnection(dbConfig);
+        connection = await getConnection();
         const sql = `
             SELECT 
                 p.id_produto, 
@@ -181,28 +220,29 @@ app.get('/api/produtos', async (req, res) => {
                 p.id_categoria,
                 c.nome_categoria
             FROM produtos AS p
-            LEFT JOIN categorias AS c
-            ON p.id_categoria = c.id_categoria
+            LEFT JOIN categorias AS c ON p.id_categoria = c.id_categoria
             ORDER BY p.id_produto DESC
         `;
         const [rows] = await connection.query(sql);
         res.json(rows);
     } catch (error) {
-        console.error('Erro ao obter os produtos:', error);
-        res.status(500).json({ error: 'Erro ao buscar produtos.' });
+        handleError(res, error, 'Erro ao buscar produtos.');
     } finally {
         if (connection) connection.end();
     }
 });
 
 app.put('/api/produtos/:id', async (req, res) => {
-    const { id } = req.params;
+    const id = parseInt(req.params.id);
     let { nome, preco, descricao, id_categoria } = req.body;
     let connection;
     try {
+        if (isNaN(id) || !nome || !preco) {
+            return res.status(400).json({ error: 'Dados do produto inválidos.' });
+        }
         nome = normalizeString(nome);
         descricao = normalizeString(descricao);
-        connection = await mysql.createConnection(dbConfig);
+        connection = await getConnection();
         const sql = `UPDATE produtos SET nome_produto = ?, preco_unitario = ?, descricao = ?, id_categoria = ? WHERE id_produto = ?`;
         const [result] = await connection.query(sql, [nome, preco, descricao, id_categoria, id]);
         
@@ -211,18 +251,20 @@ app.put('/api/produtos/:id', async (req, res) => {
         }
         res.json({ message: 'Produto atualizado com sucesso.' });
     } catch (error) {
-        console.error('Erro ao atualizar produto:', error);
-        res.status(500).json({ error: 'Erro ao atualizar o produto.' });
+        handleError(res, error, 'Erro ao atualizar o produto.');
     } finally {
         if (connection) connection.end();
     }
 });
 
 app.delete('/api/produtos/:id', async (req, res) => {
-    const { id } = req.params;
+    const id = parseInt(req.params.id);
     let connection;
     try {
-        connection = await mysql.createConnection(dbConfig);
+        if (isNaN(id)) {
+            return res.status(400).json({ error: 'ID do produto inválido.' });
+        }
+        connection = await getConnection();
         const sql = `DELETE FROM produtos WHERE id_produto = ?`;
         const [result] = await connection.query(sql, [id]);
 
@@ -231,36 +273,34 @@ app.delete('/api/produtos/:id', async (req, res) => {
         }
         res.json({ message: 'Produto excluído com sucesso.' });
     } catch (error) {
-        console.error('Erro ao excluir produto:', error);
-        res.status(500).json({ error: 'Erro ao excluir o produto.' });
+        handleError(res, error, 'Erro ao excluir o produto.');
     } finally {
         if (connection) connection.end();
     }
 });
 
 // --- API Endpoints para VENDAS ---
+
 app.get('/api/vendas/abertas', async (req, res) => {
     let connection;
     try {
-        connection = await mysql.createConnection(dbConfig);
+        connection = await getConnection();
         const sql = `
             SELECT 
                 v.id_venda,
                 v.numero_mesa,
                 v.total_venda,
-                v.data_abertura,
                 COUNT(iv.id_item_venda) AS total_itens
             FROM vendas AS v
             LEFT JOIN itens_venda AS iv ON v.id_venda = iv.id_venda
             WHERE v.status_venda = 'aberta'
-            GROUP BY v.id_venda, v.numero_mesa, v.total_venda, v.data_abertura
+            GROUP BY v.id_venda
             ORDER BY v.numero_mesa ASC
         `;
         const [rows] = await connection.query(sql);
         res.json(rows);
     } catch (error) {
-        console.error('Erro ao buscar vendas abertas:', error);
-        res.status(500).json({ error: 'Erro ao buscar vendas.' });
+        handleError(res, error, 'Erro ao buscar vendas abertas.');
     } finally {
         if (connection) connection.end();
     }
@@ -270,59 +310,85 @@ app.post('/api/vendas/abrir', async (req, res) => {
     const { numero_mesa } = req.body;
     let connection;
     try {
-        connection = await mysql.createConnection(dbConfig);
-        const [existing] = await connection.query(`SELECT * FROM vendas WHERE numero_mesa = ? AND status_venda = 'aberta'`, [numero_mesa]);
+        const mesa = parseInt(numero_mesa, 10);
+        if (isNaN(mesa) || mesa <= 0) {
+            return res.status(400).json({ error: 'O número da mesa deve ser um número inteiro positivo.' });
+        }
+
+        connection = await getConnection();
+        const [existing] = await connection.query(`SELECT * FROM vendas WHERE numero_mesa = ? AND status_venda = 'aberta'`, [mesa]);
         if (existing.length > 0) {
             return res.status(409).json({ error: 'Já existe uma comanda aberta para esta mesa.' });
         }
+        
         const sql = `INSERT INTO vendas (numero_mesa, status_venda) VALUES (?, 'aberta')`;
-        const [result] = await connection.query(sql, [numero_mesa]);
-        res.status(201).json({ id: result.insertId, message: 'Comanda aberta com sucesso.' });
+        const [result] = await connection.query(sql, [mesa]);
+        
+        res.status(201).json({ id_venda: result.insertId, numero_mesa: mesa, message: 'Comanda aberta com sucesso.' });
     } catch (error) {
-        console.error('Erro ao abrir comanda:', error);
-        res.status(500).json({ error: 'Erro ao abrir a comanda.' });
+        handleError(res, error, 'Erro ao abrir a comanda.');
     } finally {
         if (connection) connection.end();
     }
 });
 
 app.get('/api/vendas/:id', async (req, res) => {
-    const { id } = req.params;
+    const id = parseInt(req.params.id);
     let connection;
     try {
-        connection = await mysql.createConnection(dbConfig);
+        if (isNaN(id)) {
+            return res.status(400).json({ error: 'ID da venda inválido.' });
+        }
+        connection = await getConnection();
         const sql = `
             SELECT 
+                v.total_venda,
                 iv.id_item_venda, 
                 iv.quantidade, 
                 iv.preco_unitario_no_momento,
                 p.nome_produto
-            FROM itens_venda AS iv
-            JOIN produtos AS p ON iv.id_produto = p.id_produto
-            WHERE iv.id_venda = ?
+            FROM vendas AS v
+            LEFT JOIN itens_venda AS iv ON v.id_venda = iv.id_venda
+            LEFT JOIN produtos AS p ON iv.id_produto = p.id_produto
+            WHERE v.id_venda = ?
         `;
-        const [items] = await connection.query(sql, [id]);
-        
-        const [total] = await connection.query(`SELECT total_venda FROM vendas WHERE id_venda = ?`, [id]);
+        const [rows] = await connection.query(sql, [id]);
 
-        res.json({
-            items: items,
-            total: total[0].total_venda
-        });
+        // Se a venda não tem itens, ela pode ainda existir.
+        if (rows.length === 0) {
+            const [vendaResult] = await connection.query(`SELECT total_venda FROM vendas WHERE id_venda = ?`, [id]);
+            if (vendaResult.length === 0) {
+                return res.status(404).json({ error: 'Venda não encontrada.' });
+            }
+            return res.json({ items: [], total: vendaResult[0].total_venda });
+        }
+
+        const totalVenda = rows[0].total_venda;
+        const items = rows.map(row => ({
+            id_item_venda: row.id_item_venda,
+            quantidade: row.quantidade,
+            preco_unitario_no_momento: row.preco_unitario_no_momento,
+            nome_produto: row.nome_produto
+        }));
+
+        res.json({ items, total: totalVenda });
     } catch (error) {
-        console.error('Erro ao obter detalhes da venda:', error);
-        res.status(500).json({ error: 'Erro ao buscar detalhes da venda.' });
+        handleError(res, error, 'Erro ao buscar detalhes da venda.');
     } finally {
         if (connection) connection.end();
     }
 });
 
 app.post('/api/vendas/:id/item', async (req, res) => {
-    const { id } = req.params;
+    const id = parseInt(req.params.id);
     const { id_produto, quantidade } = req.body;
     let connection;
     try {
-        connection = await mysql.createConnection(dbConfig);
+        if (isNaN(id) || !id_produto || !quantidade || isNaN(quantidade) || quantidade <= 0) {
+            return res.status(400).json({ error: 'Dados inválidos.' });
+        }
+        connection = await getConnection();
+        
         const [product] = await connection.query(`SELECT preco_unitario FROM produtos WHERE id_produto = ?`, [id_produto]);
         if (product.length === 0) {
             return res.status(404).json({ error: 'Produto não encontrado.' });
@@ -335,67 +401,75 @@ app.post('/api/vendas/:id/item', async (req, res) => {
         );
         
         const total_item = preco_unitario_no_momento * quantidade;
-        await connection.query(`UPDATE vendas SET total_venda = total_venda + ? WHERE id_venda = ?`, [total_item, id]);
+        await connection.query(`UPDATE vendas SET total_venda = total_venda + ?, total_itens = total_itens + ? WHERE id_venda = ?`, [total_item, quantidade, id]);
 
         res.status(201).json({ message: 'Item adicionado à comanda.' });
     } catch (error) {
-        console.error('Erro ao adicionar item à venda:', error);
-        res.status(500).json({ error: 'Erro ao adicionar item à venda.' });
+        handleError(res, error, 'Erro ao adicionar item à venda.');
     } finally {
         if (connection) connection.end();
     }
 });
 
-app.delete('/api/vendas/:id/item/:id_item', async (req, res) => {
-    const { id, id_item } = req.params;
+app.delete('/api/vendas/:idVenda/item/:idItem', async (req, res) => {
+    const idVenda = parseInt(req.params.idVenda);
+    const idItem = parseInt(req.params.idItem);
     let connection;
     try {
-        connection = await mysql.createConnection(dbConfig);
-        const [item] = await connection.query(`SELECT quantidade, preco_unitario_no_momento FROM itens_venda WHERE id_item_venda = ?`, [id_item]);
+        if (isNaN(idVenda) || isNaN(idItem)) {
+            return res.status(400).json({ error: 'IDs de venda ou item inválidos.' });
+        }
+
+        connection = await getConnection();
+        const [item] = await connection.query(`SELECT quantidade, preco_unitario_no_momento FROM itens_venda WHERE id_item_venda = ? AND id_venda = ?`, [idItem, idVenda]);
         if (item.length === 0) {
             return res.status(404).json({ error: 'Item não encontrado na comanda.' });
         }
         
-        await connection.query(`DELETE FROM itens_venda WHERE id_item_venda = ?`, [id_item]);
+        await connection.query(`DELETE FROM itens_venda WHERE id_item_venda = ?`, [idItem]);
         
         const total_item_removido = item[0].quantidade * item[0].preco_unitario_no_momento;
-        await connection.query(`UPDATE vendas SET total_venda = total_venda - ? WHERE id_venda = ?`, [total_item_removido, id]);
+        await connection.query(`UPDATE vendas SET total_venda = total_venda - ?, total_itens = total_itens - ? WHERE id_venda = ?`, [total_item_removido, item[0].quantidade, idVenda]);
 
         res.json({ message: 'Item removido da comanda.' });
     } catch (error) {
-        console.error('Erro ao remover item da venda:', error);
-        res.status(500).json({ error: 'Erro ao remover item da venda.' });
+        handleError(res, error, 'Erro ao remover item da venda.');
     } finally {
         if (connection) connection.end();
     }
 });
 
 app.put('/api/vendas/:id/fechar', async (req, res) => {
-    const { id } = req.params;
+    const id = parseInt(req.params.id);
     const { metodo_pagamento } = req.body;
     let connection;
     try {
-        connection = await mysql.createConnection(dbConfig);
-        const sql = `UPDATE vendas SET status_venda = 'fechada', data_fechamento = NOW(), metodo_pagamento = ? WHERE id_venda = ?`;
+        if (isNaN(id)) {
+            return res.status(400).json({ error: 'ID da venda inválido.' });
+        }
+        connection = await getConnection();
+        const sql = `UPDATE vendas SET status_venda = 'fechada', data_fechamento = NOW(), metodo_pagamento = ? WHERE id_venda = ? AND status_venda = 'aberta'`;
         const [result] = await connection.query(sql, [metodo_pagamento, id]);
 
         if (result.affectedRows === 0) {
-            return res.status(404).json({ message: 'Comanda não encontrada.' });
+            return res.status(404).json({ message: 'Comanda não encontrada ou já está fechada.' });
         }
         res.json({ message: 'Comanda fechada com sucesso.' });
     } catch (error) {
-        console.error('Erro ao fechar comanda:', error);
-        res.status(500).json({ error: 'Erro ao fechar a comanda.' });
+        handleError(res, error, 'Erro ao fechar a comanda.');
     } finally {
         if (connection) connection.end();
     }
 });
 
 app.delete('/api/vendas/:id', async (req, res) => {
-    const { id } = req.params;
+    const id = parseInt(req.params.id);
     let connection;
     try {
-        connection = await mysql.createConnection(dbConfig);
+        if (isNaN(id)) {
+            return res.status(400).json({ error: 'ID da venda inválido.' });
+        }
+        connection = await getConnection();
         const [result] = await connection.query(`DELETE FROM vendas WHERE id_venda = ?`, [id]);
         
         if (result.affectedRows === 0) {
@@ -403,36 +477,31 @@ app.delete('/api/vendas/:id', async (req, res) => {
         }
         res.json({ message: 'Comanda excluída com sucesso.' });
     } catch (error) {
-        console.error('Erro ao excluir comanda:', error);
-        res.status(500).json({ error: 'Erro ao excluir a comanda.' });
+        handleError(res, error, 'Erro ao excluir a comanda.');
     } finally {
         if (connection) connection.end();
     }
 });
 
-// --- API Endpoints para RELATÓRIOS (NOVOS) ---
+// --- API Endpoints para RELATÓRIOS ---
 
-// Relatório 1: Faturamento Total do Dia detalhado por método de pagamento
 app.get('/api/relatorios/faturamento', async (req, res) => {
     let connection;
     try {
-        connection = await mysql.createConnection(dbConfig);
+        connection = await getConnection();
         
-        // Query para o total do dia
         const [totalDia] = await connection.query(`
             SELECT SUM(total_venda) AS total_dia 
             FROM vendas 
             WHERE status_venda = 'fechada' AND DATE(data_fechamento) = CURDATE()
         `);
 
-        // Query para o total em dinheiro
         const [totalDinheiro] = await connection.query(`
             SELECT SUM(total_venda) AS total_dinheiro 
             FROM vendas 
             WHERE status_venda = 'fechada' AND DATE(data_fechamento) = CURDATE() AND metodo_pagamento = 'dinheiro'
         `);
         
-        // Query para o total em cartão/pix
         const [totalCartaoPix] = await connection.query(`
             SELECT SUM(total_venda) AS total_cartao_pix 
             FROM vendas 
@@ -445,19 +514,17 @@ app.get('/api/relatorios/faturamento', async (req, res) => {
             total_cartao_pix: totalCartaoPix[0].total_cartao_pix || 0
         });
     } catch (error) {
-        console.error('Erro ao obter faturamento total:', error);
-        res.status(500).json({ error: 'Erro ao obter faturamento total.' });
+        handleError(res, error, 'Erro ao obter faturamento total.');
     } finally {
         if (connection) connection.end();
     }
 });
 
-// Relatório 2: Vendas por Período e Todas as Vendas Fechadas
 app.get('/api/relatorios/vendas_fechadas', async (req, res) => {
     const { data_inicio, data_fim } = req.query;
     let connection;
     try {
-        connection = await mysql.createConnection(dbConfig);
+        connection = await getConnection();
         let sql;
         let params = [];
 
@@ -491,18 +558,16 @@ app.get('/api/relatorios/vendas_fechadas', async (req, res) => {
         const [rows] = await connection.query(sql, params);
         res.json(rows);
     } catch (error) {
-        console.error('Erro ao obter vendas por período:', error);
-        res.status(500).json({ error: 'Erro ao obter vendas por período.' });
+        handleError(res, error, 'Erro ao obter vendas por período.');
     } finally {
         if (connection) connection.end();
     }
 });
 
-// Relatório 3: Produtos Mais Vendidos
 app.get('/api/relatorios/produtos_mais_vendidos', async (req, res) => {
     let connection;
     try {
-        connection = await mysql.createConnection(dbConfig);
+        connection = await getConnection();
         const sql = `
             SELECT 
                 p.nome_produto,
@@ -518,32 +583,31 @@ app.get('/api/relatorios/produtos_mais_vendidos', async (req, res) => {
         const [rows] = await connection.query(sql);
         res.json(rows);
     } catch (error) {
-        console.error('Erro ao obter produtos mais vendidos:', error);
-        res.status(500).json({ error: 'Erro ao obter produtos mais vendidos.' });
+        handleError(res, error, 'Erro ao obter produtos mais vendidos.');
     } finally {
         if (connection) connection.end();
     }
 });
 
-// PUT: Reabre uma venda fechada
 app.put('/api/vendas/:id/reabrir', async (req, res) => {
-    const { id } = req.params;
+    const id = parseInt(req.params.id);
     let connection;
     try {
-        connection = await mysql.createConnection(dbConfig);
+        if (isNaN(id)) {
+            return res.status(400).json({ error: 'ID da venda inválido.' });
+        }
+        connection = await getConnection();
         const [result] = await connection.query(`UPDATE vendas SET status_venda = 'aberta', data_fechamento = NULL WHERE id_venda = ?`, [id]);
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: 'Venda não encontrada.' });
         }
         res.json({ message: 'Venda reaberta com sucesso!' });
     } catch (error) {
-        console.error('Erro ao reabrir venda:', error);
-        res.status(500).json({ error: 'Erro ao reabrir a venda.' });
+        handleError(res, error, 'Erro ao reabrir a venda.');
     } finally {
         if (connection) connection.end();
     }
 });
-
 
 // --- Inicia o Servidor ---
 const startServer = async () => {

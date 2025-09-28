@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Komanda app - Vendas</title>
     <link rel="icon" href="src/favicon_io/favicon-16x16.png" type="image/x-icon">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="vendas.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400&family=Montserrat:wght@700&display=swap" rel="stylesheet">
@@ -29,7 +29,10 @@
             <h1>Mesas e Comandas</h1>
             
             <div class="order-grid" id="orderGrid">
+                <div class="order-card add-new-table" id="btnAddMesa">
+                    <h3 class="title">+</h3>
                 </div>
+            </div>
         </div>
     </main>
 
@@ -37,49 +40,102 @@
         const vendasApiUrl = 'http://localhost:3000/api/vendas';
         const produtosApiUrl = 'http://localhost:3000/api/produtos';
         const orderGrid = document.getElementById('orderGrid');
-        const totalMesas = 10;
+        const totalMesasFixas = 10;
         let expandedContainer = null;
 
-        function renderMesas() {
-            orderGrid.innerHTML = '';
-            for (let i = 1; i <= totalMesas; i++) {
-                const card = document.createElement('div');
-                card.classList.add('order-card');
-                card.dataset.mesa = i;
-                card.innerHTML = `
-                    <h3 class="title">Mesa ${i}</h3>
-                    <p class="subtitle">Comanda vazia</p>
-                `;
-                orderGrid.appendChild(card);
+        /**
+         * Renderiza as mesas fixas e atualiza o estado com as comandas abertas.
+         */
+        async function renderMesas() {
+            // Remove todos os cards existentes para evitar duplicação
+            const cardsToRemove = document.querySelectorAll('.order-card:not(.add-new-table)');
+            cardsToRemove.forEach(card => card.remove());
+
+            // Cria e insere os cards das mesas fixas
+            for (let i = 1; i <= totalMesasFixas; i++) {
+                const card = createMesaCard(`Mesa ${i}`, i, 'Comanda vazia');
+                orderGrid.insertBefore(card, document.getElementById('btnAddMesa'));
             }
+
+            // Atualiza os cards das mesas que possuem comandas abertas
+            await fetchVendasAbertas();
         }
 
+        /**
+         * Cria e retorna um elemento de card de mesa.
+         * @param {string} title O título da mesa.
+         * @param {string|number} mesaId O identificador da mesa.
+         * @param {string} subtitle O subtítulo do card.
+         * @returns {HTMLElement} O card de mesa criado.
+         */
+        function createMesaCard(title, mesaId, subtitle) {
+            const card = document.createElement('div');
+            card.classList.add('order-card');
+            card.dataset.mesa = mesaId;
+            card.innerHTML = `
+                <h3 class="title">${title}</h3>
+                <p class="subtitle">${subtitle}</p>
+            `;
+            return card;
+        }
+
+        /**
+         * Busca vendas abertas e atualiza a interface.
+         */
         async function fetchVendasAbertas() {
             try {
                 const response = await fetch(`${vendasApiUrl}/abertas`);
                 const vendasAbertas = await response.json();
                 
-                renderMesas();
-
+                // Mapeia mesas abertas para fácil acesso
+                const mesasAbertas = {};
+                const mesasDinamicasAbertas = [];
                 vendasAbertas.forEach(venda => {
-                    const mesaCard = document.querySelector(`.order-card[data-mesa="${venda.numero_mesa}"]`);
-                    if (mesaCard) {
-                        mesaCard.classList.add('open');
-                        mesaCard.dataset.idVenda = venda.id_venda;
+                    if (parseInt(venda.numero_mesa) > totalMesasFixas) {
+                        mesasDinamicasAbertas.push(venda);
+                    }
+                    mesasAbertas[venda.numero_mesa] = venda;
+                });
+                
+                // Primeiro, remove todos os cards existentes para garantir que a renderização está limpa
+                const cardsToRemove = document.querySelectorAll('.order-card:not(.add-new-table)');
+                cardsToRemove.forEach(card => card.remove());
+
+                // Em seguida, renderiza as mesas fixas
+                for (let i = 1; i <= totalMesasFixas; i++) {
+                    const card = createMesaCard(`Mesa ${i}`, i, 'Comanda vazia');
+                    orderGrid.insertBefore(card, document.getElementById('btnAddMesa'));
+                }
+
+                // E agora, renderiza as mesas dinâmicas abertas
+                mesasDinamicasAbertas.forEach(venda => {
+                    const card = createMesaCard(`Mesa ${venda.numero_mesa}`, venda.numero_mesa, 'Comanda vazia');
+                    orderGrid.insertBefore(card, document.getElementById('btnAddMesa'));
+                });
+
+                // Finalmente, atualiza o estado de todas as mesas (fixas e dinâmicas)
+                const todosOsCards = document.querySelectorAll('.order-card:not(.add-new-table)');
+                todosOsCards.forEach(card => {
+                    const numeroMesa = card.dataset.mesa;
+                    if (mesasAbertas[numeroMesa]) {
+                        const venda = mesasAbertas[numeroMesa];
+                        card.classList.add('open');
+                        card.dataset.idVenda = venda.id_venda;
                         const total = parseFloat(venda.total_venda).toFixed(2);
-                        mesaCard.innerHTML = `
+                        card.innerHTML = `
                             <h3 class="title">Mesa ${venda.numero_mesa}</h3>
                             <p class="subtitle">Total: R$ ${total}</p>
                             <p class="items-count">(${venda.total_itens} itens)</p>
                         `;
                     }
                 });
+
             } catch (error) {
                 console.error('Erro ao buscar vendas abertas:', error);
                 alert('Não foi possível carregar as comandas. Verifique se o servidor está rodando.');
             }
         }
-
+        
         async function abrirComanda(numeroMesa) {
             try {
                 const response = await fetch(`${vendasApiUrl}/abrir`, {
@@ -89,10 +145,10 @@
                 });
 
                 if (response.ok) {
-                    await fetchVendasAbertas();
                     const novaComanda = await response.json();
+                    await fetchVendasAbertas();
                     const card = document.querySelector(`.order-card[data-mesa="${numeroMesa}"]`);
-                    if(card) expandirComanda(card, novaComanda.id);
+                    if(card) expandirComanda(card, novaComanda.id_venda);
                 } else {
                     const errorData = await response.json();
                     alert(errorData.error || 'Erro ao abrir a comanda.');
@@ -102,18 +158,14 @@
                 alert('Não foi possível conectar ao servidor. Verifique se ele está rodando.');
             }
         }
-        
+
         async function fecharComanda(idVenda) {
             const metodoPagamento = prompt('Método de pagamento: (1) Dinheiro, (2) Cartão/Pix');
-            let pagamento = '';
-            if (metodoPagamento === '1') {
-                pagamento = 'dinheiro';
-            } else if (metodoPagamento === '2') {
-                pagamento = 'cartao/pix';
-            } else {
+            if (metodoPagamento !== '1' && metodoPagamento !== '2') {
                 alert('Método de pagamento inválido.');
                 return;
             }
+            const pagamento = metodoPagamento === '1' ? 'dinheiro' : 'cartao/pix';
 
             const confirmacao = confirm('Deseja realmente fechar esta comanda?');
             if (!confirmacao) return;
@@ -127,14 +179,8 @@
 
                 if (response.ok) {
                     alert('Comanda fechada com sucesso!');
-                    const card = document.querySelector(`.order-card[data-id-venda="${idVenda}"]`);
-                    if (card) {
-                        if (expandedContainer) {
-                            expandedContainer.remove();
-                            expandedContainer = null;
-                        }
-                        fetchVendasAbertas();
-                    }
+                    fecharDetalhes();
+                    fetchVendasAbertas();
                 } else {
                     const errorData = await response.json();
                     alert(errorData.error || 'Erro ao fechar comanda.');
@@ -156,10 +202,7 @@
 
                 if (response.ok) {
                     alert('Comanda excluída com sucesso!');
-                    if (expandedContainer) {
-                        expandedContainer.remove();
-                        expandedContainer = null;
-                    }
+                    fecharDetalhes();
                     fetchVendasAbertas();
                 } else {
                     const errorData = await response.json();
@@ -172,30 +215,31 @@
         }
 
         async function expandirComanda(card, idVenda) {
-            if (expandedContainer) {
-                expandedContainer.remove();
-                expandedContainer = null;
-            }
+            fecharDetalhes();
 
             try {
-                const response = await fetch(`${vendasApiUrl}/${idVenda}`); // <--- CORRIGIDO
-                const venda = await response.json();
-                
-                const productsResponse = await fetch(produtosApiUrl);
+                const [vendaResponse, productsResponse] = await Promise.all([
+                    fetch(`${vendasApiUrl}/${idVenda}`),
+                    fetch(produtosApiUrl)
+                ]);
+                const venda = await vendaResponse.json();
                 const products = await productsResponse.json();
-
+                
                 const productsListOptions = products.map(p => 
                     `<option value="${p.id_produto}">${p.nome_produto} - R$ ${parseFloat(p.preco_unitario).toFixed(2)}</option>`
                 ).join('');
 
                 const container = document.createElement('div');
                 container.classList.add('order-details-container');
+                
+                const totalVenda = venda.total ? parseFloat(venda.total).toFixed(2) : '0.00';
+
                 container.innerHTML = `
                     <div class="order-details-content">
                         <div>
                             <h3>Itens da Comanda</h3>
                             <ul class="order-items-list" id="orderItemsList-${idVenda}">
-                                ${venda.items.map(item => `
+                                ${venda.items && venda.items.length > 0 ? venda.items.map(item => `
                                     <li data-id-item="${item.id_item_venda}">
                                         <span>${item.quantidade}x ${item.nome_produto}</span>
                                         <div class="item-actions">
@@ -203,7 +247,7 @@
                                             <button class="btn-remove-item" data-id-item="${item.id_item_venda}">X</button>
                                         </div>
                                     </li>
-                                `).join('')}
+                                `).join('') : '<p>Nenhum item adicionado.</p>'}
                             </ul>
                         </div>
                         <div class="order-summary">
@@ -221,7 +265,7 @@
                             <div>
                                 <div class="total">
                                     <span>Total:</span>
-                                    <span>R$ ${parseFloat(venda.total).toFixed(2)}</span>
+                                    <span>R$ ${totalVenda}</span>
                                 </div>
                                 <div class="action-buttons" style="margin-top: 20px;">
                                     <button class="btn-finalize" data-venda-id="${idVenda}">Finalizar Venda</button>
@@ -234,42 +278,50 @@
                 
                 card.insertAdjacentElement('afterend', container);
                 expandedContainer = container;
-
-                const formAddItem = container.querySelector('.add-item-form');
-                formAddItem.addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    const idProduto = document.getElementById(`selectProduto-${idVenda}`).value;
-                    const quantidade = document.getElementById(`quantidade-${idVenda}`).value;
-                    await adicionarItem(idVenda, idProduto, quantidade);
-                    expandirComanda(card, idVenda);
-                    fetchVendasAbertas();
-                });
-
-                const btnFinalize = container.querySelector('.btn-finalize');
-                btnFinalize.addEventListener('click', () => fecharComanda(idVenda));
-
-                const btnExcluirComanda = container.querySelector('.btn-delete-order');
-                btnExcluirComanda.addEventListener('click', () => excluirComanda(idVenda));
-
-                const itemsList = container.querySelector('.order-items-list');
-                itemsList.addEventListener('click', async (e) => {
-                    if (e.target.classList.contains('btn-remove-item')) {
-                        const idItem = e.target.dataset.idItem;
-                        await removerItem(idVenda, idItem);
-                        expandirComanda(card, idVenda);
-                        fetchVendasAbertas();
-                    }
-                });
+                setupFormEventListeners(idVenda, card);
 
             } catch (error) {
                 console.error('Erro ao expandir comanda:', error);
                 alert('Não foi possível carregar os detalhes da comanda.');
             }
         }
-        
+
+        function setupFormEventListeners(idVenda, card) {
+            const formAddItem = expandedContainer.querySelector('.add-item-form');
+            formAddItem.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const idProduto = document.getElementById(`selectProduto-${idVenda}`).value;
+                const quantidade = document.getElementById(`quantidade-${idVenda}`).value;
+                await adicionarItem(idVenda, idProduto, quantidade);
+                expandirComanda(card, idVenda);
+            });
+
+            const btnFinalize = expandedContainer.querySelector('.btn-finalize');
+            btnFinalize.addEventListener('click', () => fecharComanda(idVenda));
+
+            const btnExcluirComanda = expandedContainer.querySelector('.btn-delete-order');
+            btnExcluirComanda.addEventListener('click', () => excluirComanda(idVenda));
+
+            const itemsList = expandedContainer.querySelector('.order-items-list');
+            itemsList.addEventListener('click', async (e) => {
+                if (e.target.classList.contains('btn-remove-item')) {
+                    const idItem = e.target.dataset.idItem;
+                    await removerItem(idVenda, idItem);
+                    expandirComanda(card, idVenda);
+                }
+            });
+        }
+
+        function fecharDetalhes() {
+            if (expandedContainer) {
+                expandedContainer.remove();
+                expandedContainer = null;
+            }
+        }
+
         async function adicionarItem(idVenda, idProduto, quantidade) {
             try {
-                const response = await fetch(`${vendasApiUrl}/${idVenda}/item`, { // <--- CORRIGIDO
+                const response = await fetch(`${vendasApiUrl}/${idVenda}/item`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ id_produto: idProduto, quantidade: quantidade })
@@ -277,6 +329,7 @@
                 
                 if (response.ok) {
                     alert('Item adicionado com sucesso!');
+                    await fetchVendasAbertas();
                 } else {
                     const errorData = await response.json();
                     alert(errorData.error || 'Erro ao adicionar item.');
@@ -292,12 +345,13 @@
             if (!confirmacao) return;
 
             try {
-                const response = await fetch(`${vendasApiUrl}/${idVenda}/item/${idItem}`, { // <--- CORRIGIDO
+                const response = await fetch(`${vendasApiUrl}/${idVenda}/item/${idItem}`, {
                     method: 'DELETE'
                 });
                 
                 if (response.ok) {
                     alert('Item removido com sucesso!');
+                    await fetchVendasAbertas();
                 } else {
                     const errorData = await response.json();
                     alert(errorData.error || 'Erro ao remover item.');
@@ -308,16 +362,27 @@
             }
         }
 
-        orderGrid.addEventListener('click', async function(event) {
+        async function handleCardClick(event) {
             const card = event.target.closest('.order-card');
             if (!card) return;
 
             const idVenda = card.dataset.idVenda;
             const numeroMesa = card.dataset.mesa;
 
+            if (card.id === 'btnAddMesa') {
+                const mesasExistentes = document.querySelectorAll('.order-card:not(.add-new-table)');
+                let proximoNumero = totalMesasFixas + 1;
+                const numeros = Array.from(mesasExistentes).map(m => parseInt(m.dataset.mesa)).filter(n => !isNaN(n));
+                if (numeros.length > 0) {
+                    proximoNumero = Math.max(...numeros) + 1;
+                }
+                
+                await abrirComanda(proximoNumero);
+                return;
+            }
+
             if (expandedContainer && expandedContainer.previousElementSibling === card) {
-                expandedContainer.remove();
-                expandedContainer = null;
+                fecharDetalhes();
                 return;
             }
 
@@ -326,11 +391,15 @@
             } else {
                 await abrirComanda(numeroMesa);
             }
-        });
+        }
+
+        function setupEventListeners() {
+            orderGrid.addEventListener('click', handleCardClick);
+        }
 
         document.addEventListener('DOMContentLoaded', () => {
             renderMesas();
-            fetchVendasAbertas();
+            setupEventListeners();
         });
     </script>
 </body>
