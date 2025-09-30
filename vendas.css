@@ -286,12 +286,12 @@ p {
 }
 
 .btn-finalize {
-    background-color: var(--success-color);
+    background-color: var(--primary-color);
     color: var(--secondary-color);
 }
 
 .btn-finalize:hover {
-    background-color: #218838;
+    background-color: var(--success-color);
 }
 
 .btn-delete-order {
@@ -300,8 +300,28 @@ p {
 }
 
 .btn-delete-order:hover {
-    background-color: #c82333;
+    background-color: var(--primary-color);
 }
+
+.btn-print {
+    background-color: var(--primary-color);
+    color: var(--secondary-color);
+    border: none;
+    padding: 0.75rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: var(--font-family-body);
+    font-size: 1rem;
+    transition: background-color 0.2s ease;
+    margin-bottom: 0.5rem;
+}
+
+.btn-print:hover {
+    background-color: #0056b3;
+}
+
+
+
 
 /* --- Responsividade --- */
 @media (max-width: 768px) {
@@ -321,3 +341,53 @@ p {
         grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     }
 }
+
+.icon.sales::before { content: '🛒'; }
+.icon.reports::before { content: '📈'; }
+.icon.register::before { content: '📝'; }
+
+
+        .quick-links-section {
+            display: flex;
+            justify-content:left;
+            flex-wrap: wrap;
+            gap: 30px;
+            margin-top: 30px;
+            margin-left: 30px;
+        }
+
+        .quick-link-card {
+            background-color: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 0;
+            text-align: center;
+            width: 250px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .quick-link-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+            border: var(--primary-color);
+        }
+
+        .quick-link-card a {
+            text-decoration: none;
+            color: #495057;
+        }
+
+        .quick-link-card h3 {
+            margin-top: 15px;
+            font-size: 1.2em;
+        }
+
+        .quick-link-card .icon {
+            font-size: 3em;
+            color: #007bff;
+        }
+        
+        .icon.sales::before { content: '🛒'; }
+        .icon.reports::before { content: '📈'; }
+        .icon.register::before { content: '📝'; }

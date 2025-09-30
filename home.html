@@ -18,11 +18,27 @@
         </div>
         <nav>
             <ul class="menu-items">
-                <li><a href="relatorio.html">Relatórios</a></li>
+                <li><a href="relatorio.html">   Relatórios</a></li>
                 <li><a href="cadastro.html">Cadastro</a></li>
             </ul>
         </nav>
     </header>
+
+        <section class="quick-links-section">
+
+            <div class="quick-link-card">
+                <a href="relatorio.html">
+                    <div class="icon reports"></div>
+                    <h3>Ver Relatórios</h3>
+                </a>
+            </div>
+            <div class="quick-link-card">
+                <a href="cadastro.html">
+                    <div class="icon register"></div>
+                    <h3>Cadastrar Produtos</h3>
+                </a>
+            </div>
+        </section>
 
     <main class="main-content">
         <div class="content-section">
@@ -40,7 +56,7 @@
         const vendasApiUrl = 'http://localhost:3000/api/vendas';
         const produtosApiUrl = 'http://localhost:3000/api/produtos';
         const orderGrid = document.getElementById('orderGrid');
-        const totalMesasFixas = 10;
+        const totalMesasFixas = 5;
         let expandedContainer = null;
 
         /**
@@ -268,6 +284,7 @@
                                     <span>R$ ${totalVenda}</span>
                                 </div>
                                 <div class="action-buttons" style="margin-top: 20px;">
+                                    <button class="btn-print" data-venda-id="${idVenda}">Imprimir Comanda</button>
                                     <button class="btn-finalize" data-venda-id="${idVenda}">Finalizar Venda</button>
                                     <button class="btn-delete-order" data-venda-id="${idVenda}">Excluir Comanda</button>
                                 </div>
@@ -302,6 +319,11 @@
             const btnExcluirComanda = expandedContainer.querySelector('.btn-delete-order');
             btnExcluirComanda.addEventListener('click', () => excluirComanda(idVenda));
 
+            const btnPrint = expandedContainer.querySelector('.btn-print');
+            btnPrint.addEventListener('click', async () => {
+                await imprimirComanda(idVenda);
+            });
+            
             const itemsList = expandedContainer.querySelector('.order-items-list');
             itemsList.addEventListener('click', async (e) => {
                 if (e.target.classList.contains('btn-remove-item')) {
@@ -359,6 +381,93 @@
             } catch (error) {
                 console.error('Erro ao remover item:', error);
                 alert('Não foi possível conectar ao servidor.');
+            }
+        }
+
+        /**
+         * Gera e imprime o conteúdo de uma comanda em uma nova janela.
+         * @param {number} idVenda O ID da venda a ser impressa.
+         */
+        async function imprimirComanda(idVenda) {
+            try {
+                const response = await fetch(`${vendasApiUrl}/${idVenda}`);
+                const venda = await response.json();
+
+                if (!venda || !venda.items) {
+                    alert('Não foi possível carregar os dados da comanda para impressão.');
+                    return;
+                }
+
+                const dataHora = new Date().toLocaleString('pt-BR');
+                const totalVenda = parseFloat(venda.total || 0).toFixed(2);
+                
+                // Formata os itens da comanda em HTML
+                let itensHTML = '';
+                if (venda.items.length > 0) {
+                    itensHTML = `
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Qtd</th>
+                                    <th>Descrição</th>
+                                    <th>Valor</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${venda.items.map(item => `
+                                    <tr>
+                                        <td>${item.quantidade}x</td>
+                                        <td>${item.nome_produto}</td>
+                                        <td>R$ ${parseFloat(item.preco_unitario_no_momento * item.quantidade).toFixed(2)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                } else {
+                    itensHTML = '<p style="text-align: center;">Nenhum item adicionado.</p>';
+                }
+
+                const printContent = `
+                    <style>
+                        body { font-family: 'Courier New', Courier, monospace; font-size: 12px; margin: 0; padding: 10px; }
+                        h1, h2, h3 { text-align: center; margin: 5px 0; }
+                        p { margin: 3px 0; }
+                        .center-text { text-align: center; }
+                        .divider { border-bottom: 1px dashed black; margin: 10px 0; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                        th, td { text-align: left; padding: 2px 0; }
+                        tfoot { font-weight: bold; }
+                    </style>
+                    <div class="receipt">
+                        <h2>Komanda app</h2>
+                        <h3 class="center-text">Comanda #${venda.id_venda}</h3>
+                        <p class="center-text">Mesa: ${venda.numero_mesa}</p>
+                        <p class="center-text">${dataHora}</p>
+                        <div class="divider"></div>
+                        ${itensHTML}
+                        <div class="divider"></div>
+                        <table>
+                            <tfoot>
+                                <tr>
+                                    <td></td>
+                                    <td>Total:</td>
+                                    <td>R$ ${totalVenda}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                        <div class="divider"></div>
+                        <p class="center-text">Obrigado pela preferência!</p>
+                    </div>
+                `;
+
+                const printWindow = window.open('', '_blank');
+                printWindow.document.write(printContent);
+                printWindow.document.close();
+                printWindow.print();
+            } catch (error) {
+                console.error('Erro ao imprimir comanda:', error);
+                alert('Não foi possível gerar a impressão da comanda.');
             }
         }
 
