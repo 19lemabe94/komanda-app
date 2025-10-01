@@ -24,7 +24,7 @@ A tela principal exibe o status de todas as mesas. É possível abrir novas coma
 **Adicionar Itens a uma Comanda:**
 Uma vez que a comanda está aberta, é possível adicionar produtos facilmente, com o sistema calculando automaticamente o valor total.
 
-![Tela de Vendas](https://via.placeholder.com/800x600.png?text=Komanda+App+-+Tela+de+Vendas)
+![Tela de Vendas](https://i.ibb.co/ZwTpVXp/homekomanda.jpg)
 
 **Impressão de Comandas:**
 A aplicação permite a impressão da comanda em um formato de recibo simplificado, útil para o controle do caixa ou para o cliente.
@@ -36,7 +36,7 @@ A página de relatórios fornece uma visão estratégica do negócio, permitindo
 * **Histórico de Vendas:** Permite filtrar vendas fechadas por período, com a opção de exclusão de registros.
 * **Produtos Mais Vendidos:** Um ranking dos itens mais populares, ajudando na gestão do estoque e na tomada de decisões.
 
-![Tela de Relatórios](https://via.placeholder.com/800x600.png?text=Komanda+App+-+Tela+de+Relatorios)
+![Tela de Relatórios](https://i.ibb.co/R8L6LZ9/relatoiokomanda.jpg)
 
 ### 3. Cadastro de Produtos
 A área de cadastro permite a gestão completa do cardápio.
@@ -45,7 +45,7 @@ A área de cadastro permite a gestão completa do cardápio.
 * **Categorias:** Organize seus produtos em categorias para uma melhor visualização no sistema de vendas.
 * **Exclusão em Massa:** Gerencie o cardápio de forma eficiente, com a opção de excluir múltiplos produtos de uma vez.
 
-![Tela de Cadastro](https://via.placeholder.com/800x600.png?text=Komanda+App+-+Tela+de+Cadastro)
+![Tela de Cadastro](https://i.ibb.co/Q32MH8PH/cadastrokomanda.jpg)
 
 ---
 

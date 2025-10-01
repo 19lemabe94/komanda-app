@@ -103,6 +103,7 @@ p {
     cursor: pointer;
     transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
     box-shadow: 0 4px 6px var(--card-shadow);
+    height: 200px;
 }
 
 .order-card:hover {
@@ -362,7 +363,7 @@ p {
             border-radius: 8px;
             padding: 0;
             text-align: center;
-            width: 250px;
+            width: 200px;
             transition: transform 0.2s ease, box-shadow 0.2s ease;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
         }
